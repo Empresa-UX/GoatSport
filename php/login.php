@@ -1,18 +1,17 @@
 <?php
 session_start();
+include("config.php");
 
 if (isset($_SESSION['usuario_id'])) {
-    header("Location: calendario.php");
+    header("Location: home.php"); // nueva home general
     exit();
 }
-
-include("config.php"); // Incluye el archivo de conexión a la base de datos
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    $query = "SELECT id, email, password, rol FROM usuarios WHERE email = ?";
+    $query = "SELECT user_id, email, password, rol FROM usuarios WHERE email = ?";
     if ($stmt = mysqli_prepare($conn, $query)) {
         mysqli_stmt_bind_param($stmt, "s", $email);
         mysqli_stmt_execute($stmt);
@@ -32,13 +31,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     setcookie("usuario_email", $user_email, time() + (86400 * 30), "/");
                 }
 
-                header("Location: calendario.php");
+                if ($rol === 'admin') {
+                    header("Location: calendario.php");
+                } elseif ($rol === 'proveedor') {
+                    header("Location: home_proveedor.php");
+                } else {
+                    header("Location: home_cliente.php");
+                }
                 exit();
             } else {
-                echo "<script>console.log('Credenciales incorrectas.');</script>";
+                $error = "Credenciales incorrectas.";
             }
         } else {
-            echo "<script>console.log('Credenciales incorrectas.');</script>";
+            $error = "Credenciales incorrectas.";
         }
 
         mysqli_stmt_close($stmt);
@@ -46,6 +51,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     mysqli_close($conn);
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
