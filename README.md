@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 📅 VacAction - Sistema de Gestión de Vacaciones para Empresas
 
 Bienvenido a **VacAction**, una solución de gestión de vacaciones diseñada para empresas que necesitan organizar y administrar las solicitudes de tiempo libre de su personal de manera efectiva. Este proyecto permite a los usuarios solicitar vacaciones y a los administradores revisar y aprobar dichas solicitudes a través de una interfaz amigable.
@@ -62,3 +63,6 @@ Aquí se mostrarían imágenes de las interfaces clave, como el calendario, el p
 
 ## 📄 Licencia
 Este proyecto está bajo la Licencia MIT. Consulta el archivo [LICENSE](LICENSE) para obtener más detalles.
+=======
+# GoatSport
+>>>>>>> cc21ce08a5781821075d883933a4f194b7e150f2
