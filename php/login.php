@@ -2,8 +2,9 @@
 session_start();
 include("config.php");
 
+// Si ya está logueado, redirigir a home general
 if (isset($_SESSION['usuario_id'])) {
-    header("Location: home.php"); // nueva home general
+    header("Location: home.php");
     exit();
 }
 
@@ -11,7 +12,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    $query = "SELECT user_id, email, password, rol FROM usuarios WHERE email = ?";
+    $query = "SELECT user_id, email, contrasenia, rol FROM usuarios WHERE email = ?";
     if ($stmt = mysqli_prepare($conn, $query)) {
         mysqli_stmt_bind_param($stmt, "s", $email);
         mysqli_stmt_execute($stmt);
@@ -21,7 +22,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             mysqli_stmt_bind_result($stmt, $user_id, $user_email, $user_password, $rol);
             mysqli_stmt_fetch($stmt);
 
-            if (password_verify($password, $user_password)) {
+            if ($password === $user_password) {
                 $_SESSION['usuario_id'] = $user_id;
                 $_SESSION['usuario_email'] = $user_email;
                 $_SESSION['rol'] = $rol;
@@ -32,7 +33,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
 
                 if ($rol === 'admin') {
-                    header("Location: calendario.php");
+                    header("Location: home_admin.php");
                 } elseif ($rol === 'proveedor') {
                     header("Location: home_proveedor.php");
                 } else {
@@ -45,183 +46,169 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         } else {
             $error = "Credenciales incorrectas.";
         }
-
         mysqli_stmt_close($stmt);
     }
     mysqli_close($conn);
 }
 ?>
 
-
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VacAction | Acceso</title>
-    <link rel="icon" href="../img/icons_logo/icon_white.ico" type="image/x-icon">
+    <title>Padel Alquiler | Login</title>
     <style>
         * {
             font-family: 'Arial', sans-serif;
-            color: #ffffff;
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
         body {
-            background-color: #4dd0e1;
             display: flex;
-            flex-direction: column;
-            min-height: 100vh;
             justify-content: center;
             align-items: center;
+            height: 100vh;
+            background: linear-gradient(to bottom, #054a56ff, #1bab9dff);
         }
 
-        #login-content {
-            background-color: #0288d1;
-            padding: 40px;
-            border-radius: 15px;
+        .login-box {
             width: 350px;
             text-align: center;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            color: white;
+        }
+
+        .login-box img.logo {
+            width: 90px;
             margin-bottom: 20px;
         }
 
-        #login-content img {
-            width: 100px;
-            margin-bottom: 20px;
+        .input-group {
+            margin-bottom: 15px;
         }
 
-        #login-content h3 {
-            color: #ffffff;
-            font-size: 24px;
-            margin-bottom: 30px; /* Separación extra */
-        }
-
-        .green-letter {
-            color: #4dd0e1;
-        }
-
-        .labe-input {
-            margin-top: 20px; /* Separación entre secciones */
-        }
-
-        .labe-input label {
-            color: #e0f7fa;
-            font-weight: bold;
-            margin-top: 20px; /* Margen superior adicional */
-            display: block;
-        }
-
-        .labe-input input {
+        .input-group input {
             width: 100%;
-            padding: 8px;
-            margin: 10px 0 20px; /* Más separación entre campos */
+            padding: 14px;
             border: none;
-            border-bottom: 2px solid #ffffff;
-            background-color: transparent;
-            color: #ffffff;
-        }
-
-        .labe-input input:focus {
-            border-bottom: 2px solid #4dd0e1;
-            outline: none;
-        }
-
-        .remember-session {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px; /* Separación adicional abajo */
+            border-radius: 8px;
             font-size: 14px;
         }
 
-        .remember-session input {
-            margin-right: 10px;
-        }
-
-        .submit {
-            margin-top: 20px; /* Separación antes del botón */
-        }
-
-        .submit input {
-            background-color: #4dd0e1;
-            color: #ffffff;
-            border: none;
-            border-radius: 5px;
-            padding: 10px 20px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            margin-top: 10px; /* Separación adicional */
-        }
-
-        .submit input:hover {
-            background-color: #0277bd;
-        }
-
-        .enlaceCTA {
-            margin-top: 30px; /* Separación entre enlaces */
-        }
-
-        .enlaceCTA a {
-            font-size: 11px;
-            color: #e0f7fa;
-            text-decoration: none;
-            margin: 0 15px;
-        }
-
-        .enlaceCTA a:hover {
-            color: #4dd0e1;
-        }
-
-        footer {
-            background-color: #0288d1;
-            padding: 15px 0;
-            text-align: center;
-            color: #ffffff;
+        .btn {
             width: 100%;
-            position: fixed;
-            bottom: 0;
+            padding: 14px;
+            background-color: #023e8a;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 15px 0;
+            transition: background 0.3s;
         }
 
-        footer p {
-            margin: 5px;
+        .btn:hover {
+            background-color: #0077b6;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #fff;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid rgba(255,255,255,0.4);
+        }
+
+        .divider:not(:empty)::before {
+            margin-right: .75em;
+        }
+
+        .divider:not(:empty)::after {
+            margin-left: .75em;
+        }
+
+        .google-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #fff;
+            color: #444;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .google-btn img {
+            width: 18px;
+            height: 18px;
+        }
+
+        .extra-links {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #fff;
+        }
+
+        .extra-links a {
+            color: #fff;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .extra-links a:hover {
+            text-decoration: underline;
+        }
+
+        .error {
+            color: #ffcccc;
+            margin-bottom: 15px;
+            font-size: 14px;
         }
     </style>
 </head>
-
 <body>
-    <section id="login-content">
-        <h3>Bienvenido, <span class="green-letter">Usuario.</span></h3>
+    <div class="login-box">
+        <img src="../img/logo_padel.png" alt="Logo Padel" class="logo">
 
-        <form method="POST" action="">
-            <div class="labe-input">
-                <label for="email">Direccion de Email</label>
-                <input type="email" name="email" id="email" required>
+        <?php if (!empty($error)): ?>
+            <p class="error"><?= $error ?></p>
+        <?php endif; ?>
 
-                <label for="password">Constraseña</label>
-                <input type="password" name="password" id="password" required>
+        <form method="POST">
+            <div class="input-group">
+                <input type="email" name="email" id="email" placeholder="Correo electrónico" required>
             </div>
 
-            <div class="remember-session">
-                <input type="checkbox" name="checkbox" id="checkbox">
-                <label for="checkbox">Permanecer conectado</label>
+            <div class="input-group">
+                <input type="password" name="password" id="password" placeholder="Contraseña" required>
             </div>
 
-            <div class="submit">
-                <input type="submit" name="submit" value="Acceder">
-            </div>
+            <button type="submit" class="btn">Ingresar</button>
 
-            <div class="enlaceCTA">
-                <a href="./register.php">No tienes una cuenta?</a>
+            <div class="divider">o</div>
+
+            <button type="button" class="google-btn">
+                <img src="../img/google-icon-authentication.png" alt="Google"> Continuar con Google
+            </button>
+
+            <div class="extra-links">
+                <p>¿No tenés cuenta? <a href="register.php">Registrarse</a></p>
             </div>
         </form>
-    </section>
-
-    <footer>
-        <p>Derechos reservados : VacAction ©</p>
-    </footer>
+    </div>
 </body>
-
 </html>
