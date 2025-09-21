@@ -239,14 +239,14 @@
     filter: brightness(1.05);
 }
 
-.btn-next {
+.btn-next, .btn-select {
     padding: 10px 20px;
     border-radius: 8px;
     background: linear-gradient(180deg, var(--teal-600), var(--teal-700));
     color: var(--white);
     border: none;
     cursor: pointer;
-    font-weight: 700;
+    font-weight: 700px;
     font-size: 15px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
@@ -257,10 +257,10 @@
 }
 
 .btn-select {
+    margin-top: 8px;
     width: 100%;
 }
 
-/* ====== CANCHAS GRID ====== */
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

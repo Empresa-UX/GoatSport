@@ -7,5 +7,6 @@
     <title>Panel Administrador | GoatSport</title>
     <link rel="icon" type="image/png" href="/img/isotipo_negro.jpeg">
     <link rel="stylesheet" href="../../../css/admin.css">
+    <link rel="stylesheet" href="../../../css/adminCRUD.css">
 </head>
 <body>

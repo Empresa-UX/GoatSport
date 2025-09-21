@@ -1,4 +1,7 @@
-/* Contenedor del formulario */
+.sidebar {
+  background: linear-gradient(to bottom, #054a56, #1bab9d);
+}
+
 .form-container {
     width: 40%;
     margin: 30px auto;

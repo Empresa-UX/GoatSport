@@ -2,8 +2,19 @@
 session_start();
 include("config.php");
 
-if (isset($_SESSION['usuario_id'])) {
-    header("Location: home.php");
+// Si ya está logueado, lo mandamos a su home según el rol
+if (isset($_SESSION['usuario_id']) && isset($_SESSION['rol'])) {
+    switch ($_SESSION['rol']) {
+        case 'admin':
+            header("Location: /php/admin/home_admin.php");
+            break;
+        case 'cliente':
+            header("Location: /php/cliente/home_cliente.php");
+            break;
+        default:
+            header("Location: /php/proveedor/home_cliente.php");
+            break;
+    }
     exit();
 }
 
