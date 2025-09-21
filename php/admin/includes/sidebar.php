@@ -1,5 +1,5 @@
 <aside class="sidebar">
-    <img src="/php/img/logo_padel.png" alt="Logo Padel">
+    <img src="/img/logotipo.png" alt="Logo Padel">
     <a href="/php/admin/canchas/canchas.php">Canchas</a>
     <a href="/php/admin/usuarios/usuarios.php">Usuarios</a>
     <a href="/php/admin/proveedores/proveedores.php">Proveedores</a>

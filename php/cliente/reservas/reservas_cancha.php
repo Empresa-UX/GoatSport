@@ -2,23 +2,13 @@
 require './../../config.php';
 
 try {
-    $sql = "SELECT cancha_id, nombre, ubicacion, tipo, capacidad, precio FROM canchas";
-    $result = $conn->query($sql);
+    $result = $conn->query("SELECT cancha_id, nombre, ubicacion, tipo, capacidad, precio FROM canchas");
+    if (!$result) throw new Exception($conn->error);
 
-    if (!$result) {
-        throw new Exception("Error en la consulta: " . $conn->error);
-    }
-
-    $canchas = [];
+    $canchasPorTipo = [];
     while ($row = $result->fetch_assoc()) {
-        $canchas[] = $row;
+        $canchasPorTipo[$row['tipo']][] = $row;
     }
-
-    // Clasificar por tipo
-    $clasica    = array_values(array_filter($canchas, fn($c) => $c["tipo"] === "clasica"));
-    $cubierta   = array_values(array_filter($canchas, fn($c) => $c["tipo"] === "cubierta"));
-    $panoramica = array_values(array_filter($canchas, fn($c) => $c["tipo"] === "panoramica"));
-
 } catch (Exception $e) {
     die("Error al cargar canchas: " . $e->getMessage());
 }
@@ -27,53 +17,38 @@ try {
 <?php include './../includes/header.php'; ?>
 
 <div class="page-wrap">
-    <h1 style="color:white; text-align:center; margin-bottom:30px;">Seleccionar Cancha</h1>
+    <h1 style="color:white; text-align:center; margin-bottom:30px;" class=".bton">Seleccionar Cancha</h1>
 
     <div class="grid">
-        <!-- CLÁSICAS -->
-        <div class="card">
-            <img src="./../../../img/canchas/clasica.png" alt="Cancha Clásica">
-            <h2>Cancha Clásica</h2>
-            <select onchange="mostrarInfo(this, 'clasica')">
-                <option value="">Seleccione una cancha</option>
-                <?php foreach ($clasica as $c): ?>
-                    <option value='<?= json_encode($c) ?>'>
-                        <?= htmlspecialchars($c["nombre"]) ?> - <?= htmlspecialchars($c["ubicacion"]) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <div class="info-box" id="info-clasica"></div>
-        </div>
+        <?php
+        $tipos = [
+            'clasica'    => ['Cancha Clásica', './../../../img/canchas/clasica.png'],
+            'cubierta'   => ['Cancha Cubierta', './../../../img/canchas/techada.png'],
+            'panoramica' => ['Cancha Panorámica', './../../../img/canchas/panoramica.png'],
+        ];
 
-        <!-- CUBIERTAS -->
-        <div class="card">
-            <img src="./../../../img/canchas/techada.png" alt="Cancha Techada">
-            <h2>Cancha Cubierta</h2>
-            <select onchange="mostrarInfo(this, 'cubierta')">
-                <option value="">Seleccione una cancha</option>
-                <?php foreach ($cubierta as $c): ?>
-                    <option value='<?= json_encode($c) ?>'>
-                        <?= htmlspecialchars($c["nombre"]) ?> - <?= htmlspecialchars($c["ubicacion"]) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <div class="info-box" id="info-cubierta"></div>
-        </div>
-
-        <!-- PANORÁMICAS -->
-        <div class="card">
-            <img src="./../../../img/canchas/panoramica.png" alt="Cancha Panorámica">
-            <h2>Cancha Panorámica</h2>
-            <select onchange="mostrarInfo(this, 'panoramica')">
-                <option value="">Seleccione una cancha</option>
-                <?php foreach ($panoramica as $c): ?>
-                    <option value='<?= json_encode($c) ?>'>
-                        <?= htmlspecialchars($c["nombre"]) ?> - <?= htmlspecialchars($c["ubicacion"]) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <div class="info-box" id="info-panoramica"></div>
-        </div>
+        foreach ($tipos as $tipo => [$label, $img]): ?>
+            <div class="card">
+                <img src="<?= $img ?>" alt="<?= $label ?>">
+                <h2><?= $label ?></h2>
+                <select onchange="mostrarInfo(this, '<?= $tipo ?>')">
+                    <option value="">Seleccione una cancha</option>
+                    <?php foreach ($canchasPorTipo[$tipo] ?? [] as $c): ?>
+                        <option 
+                            value="<?= $c['cancha_id'] ?>"
+                            data-nombre="<?= htmlspecialchars($c['nombre']) ?>"
+                            data-ubicacion="<?= htmlspecialchars($c['ubicacion']) ?>"
+                            data-capacidad="<?= $c['capacidad'] ?>"
+                            data-precio="<?= $c['precio'] ?>"
+                            data-tipo="<?= $c['tipo'] ?>"
+                        >
+                            <?= htmlspecialchars($c['nombre']) ?> - <?= htmlspecialchars($c['ubicacion']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="info-box" id="info-<?= $tipo ?>"></div>
+            </div>
+        <?php endforeach; ?>
     </div>
 </div>
 
@@ -87,12 +62,12 @@ function mostrarInfo(select, tipo){
         infoBox.innerHTML = "";
         return;
     }
-    const cancha = JSON.parse(select.value);
+    const c = select.options[select.selectedIndex].dataset;
     infoBox.innerHTML = `
-        <p><strong>Tipo:</strong> Cancha de pádel ${cancha.tipo}</p>
-        <p><strong>Capacidad:</strong> ${cancha.capacidad} jugadores</p>
-        <p><strong>Precio:</strong> $ ${parseFloat(cancha.precio).toLocaleString()}</p>
-        <button class="btn-select" onclick="seleccionarCancha(${cancha.cancha_id})">Seleccionar</button>
+        <p><strong>Tipo:</strong> Cancha de pádel ${c.tipo}</p>
+        <p><strong>Capacidad:</strong> ${c.capacidad} jugadores</p>
+        <p><strong>Precio:</strong> $ ${parseFloat(c.precio).toLocaleString()}</p>
+        <button class="btn-select" onclick="seleccionarCancha(${select.value})">Seleccionar</button>
     `;
     infoBox.classList.add("show");
 }

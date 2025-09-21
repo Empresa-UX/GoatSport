@@ -26,11 +26,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['usuario_email'] = $user_email;
                 $_SESSION['rol'] = $rol;
 
-                if (isset($_POST['checkbox'])) {
-                    setcookie("usuario_id", $user_id, time() + (86400 * 30), "/");
-                    setcookie("usuario_email", $user_email, time() + (86400 * 30), "/");
-                }
-
                 if ($rol === 'admin') {
                     header("Location: ./admin/home_admin.php");
                 } elseif ($rol === 'proveedor') {
@@ -57,6 +52,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/img/isotipo_negro.jpeg">
     <title>Padel Alquiler | Login</title>
     <style>
         * {
@@ -68,105 +64,96 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         body {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background: linear-gradient(to bottom, #054a56ff, #1bab9dff);
+            background: linear-gradient(135deg, #054a56ff, #1bab9dff);
+        }
+
+        .logo-container {
+            text-align: center;
+            margin-bottom: 10px;
+            /* 👈 Más espacio para que suba un poco */
+        }
+
+        .logo-container img {
+            width: 160px;
         }
 
         .login-box {
             width: 350px;
+            /* 👈 Más ancho */
+            height: 400px;
+            background: white;
+            padding: 35px 30px;
+            border-radius: 16px;
+            /* 👈 Bordes más suaves */
+            box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.15);
             text-align: center;
-            color: white;
         }
 
-        .login-box img.logo {
-            width: 90px;
+        h1 {
             margin-bottom: 20px;
+            font-size: 1.7rem;
+            color: #054a56;
         }
 
         .input-group {
-            margin-bottom: 15px;
+            position: relative;
+            margin-bottom: 20px;
         }
 
         .input-group input {
             width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
+            padding: 15px 42px 15px 15px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 16px;
+            background-color: #f9f9f9;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            border-color: #1bab9dff;
+            outline: none;
+            background-color: #fff;
+        }
+
+        .input-group svg {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            fill: #999;
         }
 
         .btn {
             width: 100%;
             padding: 14px;
-            background-color: #023e8a;
-            color: #fff;
+            background-color: #1bab9dff;
+            color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 16px;
             cursor: pointer;
-            margin: 15px 0;
-            transition: background 0.3s;
+            transition: background 0.3s ease;
+            margin-top: 10px;
         }
 
         .btn:hover {
-            background-color: #0077b6;
-        }
-
-        .divider {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            color: #fff;
-            margin: 20px 0;
-            font-size: 14px;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: "";
-            flex: 1;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-        }
-
-        .divider:not(:empty)::before {
-            margin-right: .75em;
-        }
-
-        .divider:not(:empty)::after {
-            margin-left: .75em;
-        }
-
-        .google-btn {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            background: #fff;
-            color: #444;
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .google-btn img {
-            width: 18px;
-            height: 18px;
+            background-color: #14897f;
         }
 
         .extra-links {
-            margin-top: 20px;
-            font-size: 13px;
-            color: #fff;
+            margin-top: 18px;
+            font-size: 14px;
         }
 
         .extra-links a {
-            color: #fff;
-            font-weight: bold;
+            color: #1bab9dff;
             text-decoration: none;
         }
 
@@ -175,16 +162,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         .error {
-            color: #ffcccc;
-            margin-bottom: 15px;
+            color: #b80000;
+            margin-bottom: 12px;
             font-size: 14px;
+            background: #ffe6e6;
+            padding: 8px;
+            border-radius: 6px;
         }
     </style>
 </head>
 
 <body>
+
+    <!-- Logo más arriba -->
+    <div class="logo-container">
+        <img src="/img/logotipo.png" alt="Logo Padel">
+    </div>
+
     <div class="login-box">
-        <img src="../img/logo_padel.png" alt="Logo Padel" class="logo">
+        <h1>Iniciar Sesión</h1>
 
         <?php if (!empty($error)): ?>
             <p class="error"><?= $error ?></p>
@@ -192,26 +188,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         <form method="POST">
             <div class="input-group">
-                <input type="email" name="email" id="email" placeholder="Correo electrónico" required>
+                <input type="email" name="email" placeholder="Correo electrónico" required>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M12 13.065 0 6V4l12 7 12-7v2l-12 7.065z" />
+                </svg>
             </div>
 
             <div class="input-group">
-                <input type="password" name="password" id="password" placeholder="Contraseña" required>
+                <input type="password" name="password" placeholder="Contraseña" required>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M17 9V7a5 5 0 0 0-10 0v2H5v14h14V9h-2zm-6-2a3 3 0 0 1 6 0v2H11V7z" />
+                </svg>
             </div>
 
             <button type="submit" class="btn">Ingresar</button>
-
-            <div class="divider">o</div>
-
-            <button type="button" class="google-btn">
-                <img src="../img/google-icon-authentication.png" alt="Google"> Continuar con Google
-            </button>
-
-            <div class="extra-links">
-                <p>¿No tenés cuenta? <a href="register.php">Registrarse</a></p>
-            </div>
         </form>
+
+        <div class="extra-links">
+            <a href="#">¿Olvidaste tu contraseña?</a>
+        </div>
     </div>
+
 </body>
 
 </html>

@@ -1,6 +1,6 @@
 <?php
 session_start();
-include("config.php"); // Incluye el archivo de conexión a la base de datos
+include("config.php");
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];

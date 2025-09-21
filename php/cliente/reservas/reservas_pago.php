@@ -4,14 +4,14 @@ include './../includes/header.php';
 
 $reserva_sess = $_SESSION['reserva'] ?? [];
 $canchaId = $reserva_sess['cancha_id'] ?? $_POST['cancha_id'] ?? $_GET['cancha'] ?? null;
-$fecha    = $reserva_sess['fecha'] ?? $_POST['fecha'] ?? null;
-$horaRaw  = $reserva_sess['hora_inicio'] ?? $_POST['hora_inicio'] ?? null;
+$fecha = $reserva_sess['fecha'] ?? $_POST['fecha'] ?? null;
+$horaRaw = $reserva_sess['hora_inicio'] ?? $_POST['hora_inicio'] ?? null;
 
 if (!$canchaId || !$fecha || !$horaRaw) {
     echo "<div class='page-wrap'><p>Error: faltan datos de la reserva (cancha, fecha u hora).</p>";
-    echo "<p>GET: ".htmlspecialchars(json_encode($_GET))."</p>";
-    echo "<p>POST: ".htmlspecialchars(json_encode($_POST))."</p>";
-    echo "<p>SESSION: ".htmlspecialchars(json_encode($_SESSION['reserva'] ?? []))."</p></div>";
+    echo "<p>GET: " . htmlspecialchars(json_encode($_GET)) . "</p>";
+    echo "<p>POST: " . htmlspecialchars(json_encode($_POST)) . "</p>";
+    echo "<p>SESSION: " . htmlspecialchars(json_encode($_SESSION['reserva'] ?? [])) . "</p></div>";
     include './../includes/footer.php';
     exit();
 }
@@ -34,11 +34,11 @@ if ($conn) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancha_id'], $_POST['fecha'], $_POST['hora_inicio'])) {
     $_SESSION['reserva'] = [
-        'cancha_id'   => $_POST['cancha_id'],
-        'fecha'       => $_POST['fecha'],
+        'cancha_id' => $_POST['cancha_id'],
+        'fecha' => $_POST['fecha'],
         'hora_inicio' => $_POST['hora_inicio'],
         // opcional: hora_fin por defecto 90 min después
-        'hora_fin'    => date('H:i:s', strtotime($_POST['hora_inicio'] . ' +90 minutes'))
+        'hora_fin' => date('H:i:s', strtotime($_POST['hora_inicio'] . ' +90 minutes'))
     ];
 }
 
@@ -85,41 +85,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancha_id'], $_POST['
 <?php include './../includes/footer.php'; ?>
 
 <script>
-(function () {
-    const cards = Array.from(document.querySelectorAll('.payment-card'));
-    const metodoInput = document.getElementById('metodoInput');
-    const continueBtn = document.getElementById('continueBtn');
+    (function () {
+        const cards = Array.from(document.querySelectorAll('.payment-card'));
+        const metodoInput = document.getElementById('metodoInput');
+        const continueBtn = document.getElementById('continueBtn');
 
-    function clearSelection() {
-        cards.forEach(c => {
-            c.classList.remove('selected');
-            c.setAttribute('aria-pressed', 'false');
-        });
-    }
-
-    function selectCard(card) {
-        clearSelection();
-        card.classList.add('selected');
-        card.setAttribute('aria-pressed', 'true');
-        metodoInput.value = card.dataset.metodo || '';
-    }
-
-    cards.forEach(card => {
-        card.addEventListener('click', () => selectCard(card));
-        card.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                selectCard(card);
-            }
-        });
-    });
-
-    continueBtn.addEventListener('click', () => {
-        if (!metodoInput.value) {
-            alert('Por favor seleccione un método de pago antes de continuar.');
-            return;
+        function clearSelection() {
+            cards.forEach(c => {
+                c.classList.remove('selected');
+                c.setAttribute('aria-pressed', 'false');
+            });
         }
-        document.getElementById('paymentForm').submit();
-    });
-})();
+
+        function selectCard(card) {
+            clearSelection();
+            card.classList.add('selected');
+            card.setAttribute('aria-pressed', 'true');
+            metodoInput.value = card.dataset.metodo || '';
+        }
+
+        cards.forEach(card => {
+            card.addEventListener('click', () => selectCard(card));
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    selectCard(card);
+                }
+            });
+        });
+
+        continueBtn.addEventListener('click', () => {
+            if (!metodoInput.value) {
+                alert('Por favor seleccione un método de pago antes de continuar.');
+                return;
+            }
+            document.getElementById('paymentForm').submit();
+        });
+    })();
 </script>

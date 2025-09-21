@@ -1,14 +1,9 @@
 // Ingresar como administrador
-Email: juan.perez@example.com
+Email: admin@goatsport.com
 Contraseña: admin123
 Maria Lopez
 
-// Ingresar como empleado
-Email: maria.lopez@example.com
-Contraseña: empleado123
+// Ingresar como cliente
+Email: usuario@gmail.com
+Contraseña: user123
 Carlos Garcia
-
-// Ingresar como empleado
-Email: carlos.garcia@example.com
-Contraseña: empleado456
-
