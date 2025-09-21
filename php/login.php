@@ -2,7 +2,6 @@
 session_start();
 include("config.php");
 
-// Si ya está logueado, redirigir a home general
 if (isset($_SESSION['usuario_id'])) {
     header("Location: home.php");
     exit();
@@ -33,11 +32,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
 
                 if ($rol === 'admin') {
-                    header("Location: home_admin.php");
+                    header("Location: ./admin/home_admin.php");
                 } elseif ($rol === 'proveedor') {
-                    header("Location: home_proveedor.php");
+                    header("Location: ./proveedor/home_proveedor.php");
                 } else {
-                    header("Location: home_cliente.php");
+                    header("Location: ./cliente/home_cliente.php");
                 }
                 exit();
             } else {
@@ -54,6 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -123,10 +123,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             font-size: 14px;
         }
 
-        .divider::before, .divider::after {
+        .divider::before,
+        .divider::after {
             content: "";
             flex: 1;
-            border-bottom: 1px solid rgba(255,255,255,0.4);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
         }
 
         .divider:not(:empty)::before {
@@ -180,6 +181,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     </style>
 </head>
+
 <body>
     <div class="login-box">
         <img src="../img/logo_padel.png" alt="Logo Padel" class="logo">
@@ -211,4 +213,5 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </form>
     </div>
 </body>
+
 </html>
