@@ -2,7 +2,6 @@
 include './../../config.php';
 include './../includes/header.php';
 
-// 1️⃣ Obtener puntos del ranking del usuario
 $user_id = $_SESSION['usuario_id'];
 $stmt = $conn->prepare("SELECT puntos FROM ranking WHERE usuario_id = ?");
 $stmt->bind_param("i", $user_id);
@@ -13,11 +12,9 @@ $stmt->close();
 
 $puntos_actuales = $ranking['puntos'] ?? 0;
 
-// 2️⃣ Procesar creación de torneo
 $mensaje = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($puntos_actuales >= 200) {
-        // Descontar puntos
         $nuevo_puntaje = $puntos_actuales - 200;
         $stmt = $conn->prepare("UPDATE ranking SET puntos=? WHERE usuario_id=?");
         $stmt->bind_param("ii", $nuevo_puntaje, $user_id);
@@ -25,7 +22,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
 
 
-        // Crear torneo
         $nombre = $_POST['nombre'];
         $fecha_inicio = $_POST['fecha_inicio'];
         $fecha_fin = $_POST['fecha_fin'];

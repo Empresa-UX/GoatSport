@@ -13,7 +13,6 @@ include 'auth.php';
     <link rel="icon" type="image/png" href="/img/isotipo_negro.jpeg">
     <link rel="stylesheet" href="/css/cliente.css">
     <link rel="stylesheet" href="/css/clienteReservas.css">
-    <link rel="stylesheet" href="../../../css/clienteCRUD.css">
     <link rel="stylesheet" href="/css/clienteHistorialEstadisticasRanking.css">
 
 </head>

@@ -19,6 +19,7 @@ if($action == 'edit'){
     header('Location: pagos.php');
 }
 
+
 if($action == 'delete'){
     $stmt = $conn->prepare("DELETE FROM pagos WHERE pago_id=?");
     $stmt->bind_param("i", $_POST['pago_id']);

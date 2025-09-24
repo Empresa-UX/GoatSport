@@ -14,41 +14,41 @@ body {
 }
 
 header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(0, 0, 0, 0.2);
-    padding: 0 40px;
-    height: 80px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0 40px;
+  height: 80px;
 }
 
 .logo-container {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .logo-container img {
-    width: 50px;
-    height: auto;
+  width: 50px;
+  height: auto;
 }
 
 nav {
-    display: flex;
-    align-items: center;
-    gap: 40px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
 }
 
 nav a {
-    font-size: 16px;
-    text-decoration: none;
-    color: #f0f0f0;
-    padding: 10px 0;
-    transition: color 0.3s;
+  font-size: 16px;
+  text-decoration: none;
+  color: #f0f0f0;
+  padding: 10px 0;
+  transition: color 0.3s;
 }
 
 nav a:hover {
-    color: #1bab9dff;
+  color: #1bab9dff;
 }
 
 main {
@@ -87,7 +87,7 @@ main {
 }
 
 .btn:hover {
-  background-color: #0077b6;
+  background-color: rgb(17, 161, 166)ff;
 }
 
 .main-image img {
@@ -105,91 +105,109 @@ footer {
 }
 
 .page-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 30px;
-    text-align: center;
-    color: #222;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 30px;
+  text-align: center;
+  color: #222;
 }
 
 .card-white {
-    background: #fff;
-    border-radius: 16px;
-    padding: 30px 40px;
-    box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08);
-    max-width: 700px;
-    margin: 0 auto;
-    transition: transform 0.2s ease;
+  background: #fff;
+  border-radius: 16px;
+  padding: 30px 40px;
+  box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08);
+  max-width: 700px;
+  margin: 0 auto;
+  transition: transform 0.2s ease;
 }
 
 .card-white:hover {
-    transform: translateY(-2px);
+  transform: translateY(-2px);
 }
 
 .torneo-form {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .torneo-form label {
-    font-weight: 600;
-    font-size: 1rem;
-    margin-top: 10px;
-    color: #333;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-top: 10px;
+  color: #333;
 }
 
 .torneo-form input {
-    padding: 12px 14px;
-    font-size: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    outline: none;
-    transition: border 0.2s ease, box-shadow 0.2s ease;
+  padding: 12px 14px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  outline: none;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
 }
 
 .torneo-form input:focus {
-    border-color: #007BFF;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+  border-color: #007BFF;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
 }
 
+.torneo-form textarea {
+  padding: 12px 14px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  outline: none;
+  resize: vertical; /* solo permite redimensionar verticalmente */
+  min-height: 120px;
+  line-height: 1.5;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.torneo-form textarea:focus {
+  border-color: #007BFF;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+}
+
+
 .torneo-form .info {
-    font-size: 0.95rem;
-    color: #444;
-    text-align: center;
-    background: #f8f9fa;
-    padding: 10px;
-    border-radius: 8px;
+  font-size: 0.95rem;
+  color: #444;
+  text-align: center;
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 8px;
 }
 
 .btn-add {
-    background-color: #007BFF;
-    color: white;
-    border: none;
-    padding: 12px;
-    font-size: 1rem;
-    font-weight: 600;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background 0.3s ease, transform 0.1s ease;
+  background-color: var(--teal-500);
+  color: white;
+  border: none;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.1s ease;
 }
 
 .btn-add:hover {
-    background-color: #0056b3;
-    transform: scale(1.02);
+  background-color: #07566bff;
+  transform: scale(1.02);
 }
 
 .success,
 .error {
-    padding: 12px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    font-weight: 600;
-    text-align: center;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-weight: 600;
+  text-align: center;
 }
 
 .success {
-    background: #e6ffed;
-    color: #1d7a2e;
-    border: 1px solid #1d7a2e;
+  background: #e6ffed;
+  color: #1d7a2e;
+  border: 1px solid #1d7a2e;
 }

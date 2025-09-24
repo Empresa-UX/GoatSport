@@ -17,7 +17,7 @@ try {
 <?php include './../includes/header.php'; ?>
 
 <div class="page-wrap">
-    <h1 style="color:white; text-align:center; margin-bottom:30px;" class=".bton">Seleccionar Cancha</h1>
+    <h1 style="color:white; text-align:center; margin-bottom:30px;" class=".bton">Seleccione una cancha</h1>
 
     <div class="grid">
         <?php

@@ -38,3 +38,4 @@ th { font-weight: 700; }
 @media (max-width: 900px) {
     .stats-container { grid-template-columns: 1fr; }
 }
+
