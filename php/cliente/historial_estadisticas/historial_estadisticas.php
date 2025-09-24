@@ -2,7 +2,6 @@
 include './../../config.php';
 include './../includes/header.php';
 
-// ✅ 1) Obtener últimas reservas
 $sql_reservas = "
     SELECT r.fecha, r.hora_inicio, r.hora_fin, c.ubicacion, c.cancha_id
     FROM reservas r
@@ -17,7 +16,6 @@ $stmt->execute();
 $result_reservas = $stmt->get_result();
 $ultimas_reservas = $result_reservas->fetch_all(MYSQLI_ASSOC);
 
-// ✅ 2) Obtener estadísticas desde ranking
 $sql_stats = "
     SELECT 
         r.partidos AS partidos_jugados,
@@ -34,7 +32,6 @@ $stmt2->bind_param("i", $_SESSION['usuario_id']);
 $stmt2->execute();
 $estadisticas = $stmt2->get_result()->fetch_assoc();
 
-// Si el usuario no tiene ranking todavía, ponemos todo en 0
 if (!$estadisticas) {
     $estadisticas = [
         'partidos_jugados' => 0,
@@ -46,12 +43,10 @@ if (!$estadisticas) {
 }
 ?>
 
-<main>
     <div class="page-wrap">
         <h1 class="page-title">Historial y estadísticas</h1>
 
         <div class="stats-container">
-            <!-- Historial -->
             <div>
                 <h2 class="section-title">Últimas reservas</h2>
                 <div class="card-white">
@@ -82,7 +77,6 @@ if (!$estadisticas) {
                 </div>
             </div>
 
-            <!-- Estadísticas -->
             <div>
                 <h2 class="section-title">Estadísticas</h2>
                 <div class="card-white">
@@ -114,6 +108,5 @@ if (!$estadisticas) {
             </div>
         </div>
     </div>
-</main>
 
 <?php include './../includes/footer.php'; ?>

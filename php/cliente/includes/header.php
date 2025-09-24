@@ -20,7 +20,6 @@ include 'auth.php';
 
 <body>
     <header>
-        <!-- Div separado para el logo -->
         <div class="logo-container">
             <img src="/img/logotipo.png" alt="Logo Padel">
         </div>
@@ -30,6 +29,7 @@ include 'auth.php';
             <a href="/php/cliente/historial_estadisticas/historial_estadisticas.php">Mis reservas y estadísticas</a>
             <a href="/php/cliente/ranking/ranking.php">Ranking</a>
             <a href="/php/cliente/torneos/torneos.php">Torneos</a>
+            <a href="/php/cliente/reportes/reportes.php">Reportes</a>
             <a href="/php/logout.php">Cerrar sesión</a>
         </nav>
     </header>

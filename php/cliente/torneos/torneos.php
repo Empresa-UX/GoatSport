@@ -44,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
-<main>
     <div class="page-wrap">
         <h1 class="page-title">Crear Torneo</h1>
 
@@ -68,6 +67,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
     </div>
-</main>
 
 <?php include './../includes/footer.php'; ?>

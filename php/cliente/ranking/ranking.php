@@ -18,7 +18,6 @@ $sql = "
 $result = $conn->query($sql);
 ?>
 
-<main>
     <div class="page-wrap">
         <h1 class="page-title">Ranking</h1>
 
@@ -57,6 +56,5 @@ $result = $conn->query($sql);
             </table>
         </div>
     </div>
-</main>
 
 <?php include './../includes/footer.php'; ?>

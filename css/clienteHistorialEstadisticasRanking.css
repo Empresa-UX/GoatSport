@@ -16,13 +16,11 @@ body {
     margin: 0;
 }
 
-/* Layout */
 .page-wrap { width: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
 .page-title { font-size: 40px; font-weight: 700; margin-bottom: 10px; color: var(--white); }
 .stats-container { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 40px; }
 .section-title { font-size: 22px; font-weight: 700; margin-bottom: 14px; color: var(--white); }
 
-/* Tarjetas */
 .card-white {
     background: var(--white);
     border-radius: 12px;
@@ -31,7 +29,6 @@ body {
     color: var(--text-dark);
 }
 
-/* Tablas */
 table { width: 100%; border-collapse: collapse; font-size: 17px; }
 th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
 th { font-weight: 700; }

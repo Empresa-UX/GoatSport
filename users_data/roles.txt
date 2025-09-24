@@ -1,9 +1,7 @@
 // Ingresar como administrador
 Email: admin@goatsport.com
 Contraseña: admin123
-Maria Lopez
 
 // Ingresar como cliente
 Email: usuario@gmail.com
 Contraseña: user123
-Carlos Garcia

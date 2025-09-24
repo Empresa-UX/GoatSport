@@ -1,4 +1,4 @@
-<footer>Padel Alquiler © <?= date("Y"); ?> - Todos los derechos reservados</footer>
+<footer>Goat Sport © <?= date("Y"); ?> - Todos los derechos reservados</footer>
     </div>
 </div>
 </body>
