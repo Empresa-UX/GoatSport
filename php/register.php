@@ -2,59 +2,52 @@
 session_start();
 include("config.php");
 
-if (isset($_SESSION['usuario_id']) && isset($_SESSION['rol'])) {
-    switch ($_SESSION['rol']) {
-        case 'admin':
-            header("Location: /php/admin/home_admin.php");
-            break;
-        case 'cliente':
-            header("Location: /php/cliente/home_cliente.php");
-            break;
-        default:
-            header("Location: /php/proveedor/home_cliente.php");
-            break;
-    }
-    exit();
-}
+$mensaje = '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST['email'];
-    $password = $_POST['password'];
+    $nombre = trim($_POST['nombre']);
+    $email = trim($_POST['email']);
+    $password = trim($_POST['password']);
 
-    $query = "SELECT user_id, email, contrasenia, rol FROM usuarios WHERE email = ?";
-    if ($stmt = mysqli_prepare($conn, $query)) {
-        mysqli_stmt_bind_param($stmt, "s", $email);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_store_result($stmt);
+    // Verificar si el email ya está registrado
+    $query = "SELECT user_id FROM usuarios WHERE email = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $stmt->store_result();
 
-        if (mysqli_stmt_num_rows($stmt) == 1) {
-            mysqli_stmt_bind_result($stmt, $user_id, $user_email, $user_password, $rol);
-            mysqli_stmt_fetch($stmt);
+    if ($stmt->num_rows > 0) {
+        $mensaje = "<p class='error'>⚠️ El correo ya está registrado.</p>";
+    } else {
+        // Datos por defecto
+        $rol = "cliente";
+        $puntos = 0;
+        $fecha_registro = date("Y-m-d H:i:s");
 
-            if ($password === $user_password) {
-                $_SESSION['usuario_id'] = $user_id;
-                $_SESSION['usuario_email'] = $user_email;
-                $_SESSION['rol'] = $rol;
+        // Insertar nuevo usuario
+        $insert = $conn->prepare("INSERT INTO usuarios (nombre, email, contrasenia, rol, puntos, fecha_registro) 
+                                  VALUES (?, ?, ?, ?, ?, ?)");
+        $insert->bind_param("ssssis", $nombre, $email, $password, $rol, $puntos, $fecha_registro);
 
-                if ($rol === 'admin') {
-                    header("Location: ./admin/home_admin.php");
-                } elseif ($rol === 'proveedor') {
-                    header("Location: ./proveedor/home_proveedor.php");
-                } else {
-                    header("Location: ./cliente/home_cliente.php");
-                }
-                exit();
-            } else {
-                $error = "Credenciales incorrectas.";
-            }
+        if ($insert->execute()) {
+            $_SESSION['usuario_id'] = $insert->insert_id;
+            $_SESSION['usuario_email'] = $email;
+            $_SESSION['rol'] = "cliente";
+
+            header("Location: ./cliente/home_cliente.php");
+            exit();
         } else {
-            $error = "Credenciales incorrectas.";
+            $mensaje = "<p class='error'>⚠️ Error al registrarse. Intenta de nuevo.</p>";
         }
-        mysqli_stmt_close($stmt);
+
+        $insert->close();
     }
-    mysqli_close($conn);
+
+    $stmt->close();
+    $conn->close();
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="es">
@@ -63,7 +56,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/img/isotipo_negro.jpeg">
-    <title>Padel Alquiler | Login</title>
+    <title>Padel Alquiler | Registro</title>
     <style>
         * {
             font-family: 'Arial', sans-serif;
@@ -91,8 +84,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         .login-box {
-            width: 350px;
-            height: 400px;
+            width: 380px;
             background: white;
             padding: 35px 30px;
             border-radius: 16px;
@@ -157,7 +149,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .extra-links {
             margin-top: 18px;
             font-size: 14px;
-            display: flex;
         }
 
         .extra-links a {
@@ -177,13 +168,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 
     <div class="login-box">
-        <h1>Iniciar Sesión</h1>
+        <h1>Registro de usuario</h1>
 
-        <?php if (!empty($error)): ?>
-            <p class="error"><?= $error ?></p>
-        <?php endif; ?>
+        <?= $mensaje ?>
 
         <form method="POST">
+            <div class="input-group">
+                <input type="text" name="nombre" placeholder="Nombre completo" required>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M12 12c2.67 0 8 1.34 8 4v2H4v-2c0-2.66 5.33-4 8-4zm0-2a4 4 0 1 0-4-4 4 4 0 0 0 4 4z" />
+                </svg>
+            </div>
+
             <div class="input-group">
                 <input type="email" name="email" placeholder="Correo electrónico" required>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -198,16 +194,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </svg>
             </div>
 
-            <button type="submit" class="btn">Ingresar</button>
+            <button type="submit" class="btn">Registrarme</button>
         </form>
 
         <div class="extra-links">
-            <a href="register.php">¿No tienes una cuenta?</a>
-            <a href="forgot.php">¿Olvidaste tu contraseña?</a>
-            
+            <a href="login.php">¿Ya tienes una cuenta? Inicia sesión</a>
         </div>
     </div>
-
 </body>
 
 </html>

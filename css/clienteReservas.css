@@ -6,7 +6,6 @@
     --card-bg: rgba(255, 255, 255, 0.08);
 }
 
-/* ====== FLOW HEADER ====== */
 .flow-header {
     display: flex;
     flex-direction: column;
@@ -33,13 +32,13 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    font-size: 18px;
+    font-size: 25px;
     color: rgba(255, 255, 255, 0.85);
 }
 
 .step .circle {
-    width: 40px;
-    height: 40px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
@@ -60,7 +59,7 @@
 }
 
 .step .label {
-    font-size: 20px;
+    font-size: 27px;
     font-weight: 600;
     color: rgba(255, 255, 255, 0.95);
     margin-top: 4px;
@@ -221,9 +220,7 @@
     margin-top: 14px;
 }
 
-/* ====== BOTONES GENERALES ====== */
 .btn {
-    padding: 10px 20px;
     border-radius: 8px;
     border: none;
     cursor: pointer;
@@ -390,13 +387,12 @@
     margin-top: 20px;
 }
 
-/* ====== CONFIRMACIÓN ====== */
 .confirmation-container {
     background: var(--white);
     padding: 30px;
     border-radius: 16px;
     max-width: 720px;
-    margin: 40px auto;
+    margin: auto;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
     color: #043b3d;
     transition: all 0.3s ease;
@@ -447,13 +443,13 @@
 }
 
 .confirmation-container .btn.back {
-    background: #e8f6f5;
-    color: #043b3d;
+    background: var(--teal-500);
+    color: var(--white);
     border: 1px solid #cce6e4;
 }
 
 .confirmation-container .btn.back:hover {
-    background: #d2eeeb;
+    background: #139488;
 }
 
 .confirmation-container .btn.confirm {

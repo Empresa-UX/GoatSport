@@ -82,12 +82,7 @@ main {
   border-radius: 8px;
   font-size: 16px;
   cursor: pointer;
-  transition: background 0.3s;
   text-decoration: none;
-}
-
-.btn:hover {
-  background-color: rgb(17, 161, 166)ff;
 }
 
 .main-image img {
@@ -159,7 +154,7 @@ footer {
   border: 1px solid #ccc;
   border-radius: 10px;
   outline: none;
-  resize: vertical; /* solo permite redimensionar verticalmente */
+  resize: vertical;
   min-height: 120px;
   line-height: 1.5;
   transition: border 0.2s ease, box-shadow 0.2s ease;
