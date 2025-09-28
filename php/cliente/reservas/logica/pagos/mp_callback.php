@@ -1,20 +1,19 @@
 <?php
 declare(strict_types=1);
-require __DIR__ . '/../../../../../config.php';
+require __DIR__ . '/../../../../config.php';
 require __DIR__ . '/../../../../../lib/util.php';
 ensure_session();
 
-$status = $_GET['status'] ?? 'failure';
+$status     = $_GET['status'] ?? 'failure';
+$payment_id = $_GET['payment_id'] ?? ($_GET['collection_id'] ?? null);
+
+/** Por qué: no confirmamos acá, solo UX. */
+$_SESSION['mp_callback_hint'] = [
+  'status' => $status,
+  'payment_id' => $payment_id,
+];
 
 if ($status === 'success') {
-  // Nota: podrías leer $_GET['payment_id'] y guardar referencia.
-  $_SESSION['pago'] = [
-    'metodo'     => 'mercadopago',
-    'estado'     => 'pagado',
-    'monto'      => 0, // en confirmación se toma el precio real de la cancha
-    'fecha_pago' => date('Y-m-d H:i:s'),
-    'payment_id' => $_GET['payment_id'] ?? null,
-  ];
   ?>
   <form id="ok" method="post" action="../../steps/reservas_confirmacion.php">
     <?= csrf_input() ?>
