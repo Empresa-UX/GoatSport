@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1:3307
--- Tiempo de generación: 25-09-2025 a las 03:52:34
+-- Tiempo de generación: 25-09-2025 a las 05:51:25
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.2.12
 
@@ -176,7 +176,8 @@ INSERT INTO `password_resets` (`id`, `user_id`, `codigo`, `expira`, `usado`, `cr
 (27, 19, '642712', '2025-09-25 03:44:52', 0, '2025-09-25 01:34:52'),
 (28, 19, '632624', '2025-09-25 03:47:02', 0, '2025-09-25 01:37:02'),
 (29, 19, '365387', '2025-09-25 03:55:47', 0, '2025-09-25 01:45:47'),
-(30, 19, '835715', '2025-09-25 03:59:57', 0, '2025-09-25 01:49:57');
+(30, 19, '835715', '2025-09-25 03:59:57', 0, '2025-09-25 01:49:57'),
+(31, 19, '765312', '2025-09-25 04:05:21', 0, '2025-09-25 01:55:21');
 
 -- --------------------------------------------------------
 
@@ -257,15 +258,11 @@ INSERT INTO `reservas` (`reserva_id`, `cancha_id`, `creador_id`, `fecha`, `hora_
 (9, 2, 3, '2025-09-21', '09:00:00', '10:30:00', 'pendiente'),
 (10, 2, 4, '2025-09-21', '19:00:00', '20:30:00', 'confirmada'),
 (11, 2, 9, '2025-09-21', '12:00:00', '13:00:00', 'confirmada'),
-(12, 2, 7, '2025-09-21', '13:30:00', '15:00:00', 'confirmada'),
-(13, 2, 7, '2025-09-21', '17:00:00', '18:30:00', 'confirmada'),
-(14, 8, 7, '2025-09-21', '08:30:00', '10:00:00', 'confirmada'),
 (15, 2, 7, '2025-09-21', '20:30:00', '22:00:00', 'confirmada'),
 (16, 12, 7, '2025-09-21', '10:00:00', '11:30:00', 'confirmada'),
 (17, 7, 7, '2025-09-22', '20:00:00', '21:30:00', 'pendiente'),
 (18, 7, 7, '2025-09-21', '08:00:00', '09:30:00', 'confirmada'),
 (19, 7, 7, '2025-09-27', '09:30:00', '11:00:00', 'pendiente'),
-(20, 7, 7, '2025-09-28', '10:30:00', '12:00:00', 'confirmada'),
 (21, 2, 7, '2025-09-23', '08:00:00', '09:30:00', 'pendiente'),
 (22, 2, 7, '2025-09-27', '08:00:00', '09:30:00', 'pendiente'),
 (23, 8, 7, '2025-09-21', '10:30:00', '12:00:00', 'confirmada'),
@@ -288,7 +285,7 @@ INSERT INTO `reservas` (`reserva_id`, `cancha_id`, `creador_id`, `fecha`, `hora_
 (40, 7, 7, '2025-09-24', '11:00:00', '12:30:00', 'confirmada'),
 (41, 7, 7, '2025-09-24', '18:00:00', '19:30:00', 'confirmada'),
 (42, 7, 7, '2025-09-24', '16:30:00', '18:00:00', 'pendiente'),
-(43, 7, 7, '2025-09-24', '20:30:00', '22:00:00', 'pendiente');
+(44, 7, 7, '2025-09-30', '08:00:00', '09:30:00', 'pendiente');
 
 -- --------------------------------------------------------
 
@@ -470,7 +467,7 @@ ALTER TABLE `partidos`
 -- AUTO_INCREMENT de la tabla `password_resets`
 --
 ALTER TABLE `password_resets`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
 
 --
 -- AUTO_INCREMENT de la tabla `ranking`
@@ -488,7 +485,7 @@ ALTER TABLE `reportes`
 -- AUTO_INCREMENT de la tabla `reservas`
 --
 ALTER TABLE `reservas`
-  MODIFY `reserva_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
+  MODIFY `reserva_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
 
 --
 -- AUTO_INCREMENT de la tabla `torneos`

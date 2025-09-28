@@ -1,5 +1,5 @@
 <?php
-require './../../config.php';
+require './../../../config.php';
 
 try {
     $result = $conn->query("SELECT cancha_id, nombre, ubicacion, tipo, capacidad, precio FROM canchas");
@@ -14,7 +14,7 @@ try {
 }
 ?>
 
-<?php include './../includes/header.php'; ?>
+<?php include './../../includes/header.php'; ?>
 
 <div class="page-wrap">
     <h1 style="color:white; text-align:center;" class=".bton">Seleccione una cancha</h1>
@@ -22,9 +22,9 @@ try {
     <div class="grid">
         <?php
         $tipos = [
-            'clasica'    => ['Cancha Clásica', './../../../img/canchas/clasica.png'],
-            'cubierta'   => ['Cancha Cubierta', './../../../img/canchas/techada.png'],
-            'panoramica' => ['Cancha Panorámica', './../../../img/canchas/panoramica.png'],
+            'clasica'    => ['Cancha Clásica', './../../../../img/canchas/clasica.png'],
+            'cubierta'   => ['Cancha Cubierta', './../../../../img/canchas/techada.png'],
+            'panoramica' => ['Cancha Panorámica', './../../../../img/canchas/panoramica.png'],
         ];
 
         foreach ($tipos as $tipo => [$label, $img]): ?>
@@ -52,7 +52,7 @@ try {
     </div>
 </div>
 
-<?php include './../includes/footer.php'; ?>
+<?php include './../../includes/footer.php'; ?>
 
 <script>
 function mostrarInfo(select, tipo){

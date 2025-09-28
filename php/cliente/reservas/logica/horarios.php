@@ -1,7 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-$configPath = __DIR__ . '/../../config.php';
+$configPath = __DIR__ . '/../../../config.php';
 if (!file_exists($configPath)) {
     http_response_code(500);
     echo json_encode(['error' => 'config.php no encontrado']);

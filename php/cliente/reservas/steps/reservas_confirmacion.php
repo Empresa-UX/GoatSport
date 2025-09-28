@@ -1,22 +1,20 @@
 <?php
-include './../../config.php';
-include './../includes/header.php';
+require __DIR__ . '/../../../config.php';
+include './../../includes/header.php';
+require __DIR__ . '/../../../../lib/util.php';
+ensure_session();
 
 $reserva = $_SESSION['reserva'] ?? [];
 $canchaId    = $reserva['cancha_id'] ?? null;
 $fecha       = $reserva['fecha'] ?? null;
 $horaInicio  = $reserva['hora_inicio'] ?? null;
 $horaFin     = $reserva['hora_fin'] ?? null;
-
-// Método de pago
-$metodo = $_POST['metodo'] ?? null;
+$metodo      = $_POST['metodo'] ?? null;
 
 if (!$canchaId || !$fecha || !$horaInicio) {
     echo "<div class='page-wrap'><p>Error: faltan datos de la reserva (cancha, fecha u hora).</p></div>";
     include './../includes/footer.php'; exit;
 }
-
-// Funciones auxiliares
 function parseHora(string $hora = null): ?DateTime {
     if (!$hora) return null;
     foreach (['H:i:s', 'H:i'] as $fmt) {
@@ -27,19 +25,12 @@ function parseHora(string $hora = null): ?DateTime {
 }
 function formatHora(DateTime $dt): string { return $dt->format('H:i:s'); }
 
-// Procesar horas
 $dtInicio = parseHora($horaInicio);
-if (!$dtInicio) {
-    echo "<div class='page-wrap'><p>Error: hora inválida.</p></div>";
-    include './../includes/footer.php'; exit;
-}
-$dtFin = $horaFin ? parseHora($horaFin) : null;
-if (!$dtFin) $dtFin = (clone $dtInicio)->add(new DateInterval('PT90M'));
-
+if (!$dtInicio) { echo "<div class='page-wrap'><p>Error: hora inválida.</p></div>"; include './../includes/footer.php'; exit; }
+$dtFin = $horaFin ? parseHora($horaFin) : (clone $dtInicio)->add(new DateInterval('PT90M'));
 $hora_inicio_sql = formatHora($dtInicio);
 $hora_fin_sql    = formatHora($dtFin);
 
-// Datos cancha
 $canchaNombre = "Cancha #$canchaId";
 $canchaPrecio = null;
 if ($stmt = $conn->prepare("SELECT nombre, precio FROM canchas WHERE cancha_id = ?")) {
@@ -47,20 +38,19 @@ if ($stmt = $conn->prepare("SELECT nombre, precio FROM canchas WHERE cancha_id =
     $stmt->execute();
     if ($row = $stmt->get_result()->fetch_assoc()) {
         $canchaNombre = $row['nombre'];
-        $canchaPrecio = $row['precio'];
+        $canchaPrecio = (float)$row['precio'];
     }
     $stmt->close();
 }
 
-// Insertar reserva
-$usuarioId = intval($_SESSION['usuario_id']);
-$estado    = ($metodo === 'efectivo') ? 'pendiente' : 'confirmada';
+$usuarioId = intval($_SESSION['usuario_id'] ?? 0);
+if ($usuarioId <= 0) { echo "<div class='page-wrap'><p>Error: sesión de usuario inválida.</p></div>"; include './../includes/footer.php'; exit; }
+
+$estadoReserva = ($metodo === 'efectivo') ? 'pendiente' : 'confirmada';
 $insertedId = null; $errorMsg = null;
 
 try {
     $conn->begin_transaction();
-
-    // Verificar solapamiento
     $chk = $conn->prepare("
         SELECT COUNT(*) AS cnt 
         FROM reservas 
@@ -81,11 +71,32 @@ try {
             INSERT INTO reservas (cancha_id, creador_id, fecha, hora_inicio, hora_fin, estado) 
             VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $ins->bind_param("iissss", $canchaId, $usuarioId, $fecha, $hora_inicio_sql, $hora_fin_sql, $estado);
+        $ins->bind_param("iissss", $canchaId, $usuarioId, $fecha, $hora_inicio_sql, $hora_fin_sql, $estadoReserva);
         $ins->execute();
         $insertedId = $ins->insert_id;
         $ins->close();
 
+        // === Insertar en tu tabla `pagos` ===
+        $estadoPago = ($metodo === 'efectivo') ? 'pendiente' : 'pagado';
+        $montoPago  = $canchaPrecio ?? 0.0;
+
+        if ($estadoPago === 'pagado') {
+            $stmtPago = $conn->prepare("
+                INSERT INTO pagos (reserva_id, jugador_id, monto, estado, fecha_pago)
+                VALUES (?, ?, ?, 'pagado', NOW())
+            ");
+            $stmtPago->bind_param("iid", $insertedId, $usuarioId, $montoPago);
+            $stmtPago->execute(); $stmtPago->close();
+        } else {
+            $stmtPago = $conn->prepare("
+                INSERT INTO pagos (reserva_id, jugador_id, monto, estado, fecha_pago)
+                VALUES (?, ?, ?, 'pendiente', NULL)
+            ");
+            $stmtPago->bind_param("iid", $insertedId, $usuarioId, $montoPago);
+            $stmtPago->execute(); $stmtPago->close();
+        }
+
+        unset($_SESSION['pago']);
         $conn->commit();
         unset($_SESSION['reserva']);
     }
@@ -94,7 +105,6 @@ try {
     $errorMsg = "Error interno: " . $e->getMessage();
 }
 ?>
-
 <div class="page-wrap" style="max-width:900px; margin:30px auto;">
     <div class="flow-header">
         <h1>Flujo de Reserva</h1>
@@ -108,21 +118,21 @@ try {
     <div class="confirmation-container">
         <?php if ($errorMsg): ?>
             <div class="confirmation-title error">No fue posible completar la reserva</div>
-            <div class="summary"><div><strong>Motivo:</strong> <?= htmlspecialchars($errorMsg) ?></div></div>
+            <div class="summary"><div><strong>Motivo:</strong> <?= h($errorMsg) ?></div></div>
             <div style="text-align:center; margin-top:20px;">
                 <a href="reservas.php?cancha=<?= (int)$canchaId ?>" class="btn back">Volver a elegir horario</a>
             </div>
         <?php else: ?>
             <div class="confirmation-title">Reserva confirmada</div>
             <div class="summary">
-                <div><strong>ID reserva:</strong> <?= htmlspecialchars($insertedId) ?></div>
-                <div><strong>Cancha:</strong> <?= htmlspecialchars($canchaNombre) ?></div>
-                <div><strong>Fecha:</strong> <?= htmlspecialchars($fecha) ?></div>
-                <div><strong>Hora:</strong> <?= htmlspecialchars("$hora_inicio_sql - $hora_fin_sql") ?></div>
-                <div><strong>Método de pago:</strong> <?= htmlspecialchars(ucfirst($metodo ?? 'No elegido')) ?></div>
-                <div><strong>Estado:</strong> <?= htmlspecialchars(ucfirst($estado)) ?></div>
+                <div><strong>ID reserva:</strong> <?= (int)$insertedId ?></div>
+                <div><strong>Cancha:</strong> <?= h($canchaNombre) ?></div>
+                <div><strong>Fecha:</strong> <?= h($fecha) ?></div>
+                <div><strong>Hora:</strong> <?= h($hora_inicio_sql . ' - ' . $hora_fin_sql) ?></div>
+                <div><strong>Método de pago:</strong> <?= h(ucfirst($metodo ?? 'No elegido')) ?></div>
+                <div><strong>Estado de la reserva:</strong> <?= h(ucfirst($estadoReserva)) ?></div>
                 <?php if ($canchaPrecio !== null): ?>
-                    <div><strong>Precio:</strong> $ <?= number_format($canchaPrecio, 2, ',', '.') ?></div>
+                    <div><strong>Precio:</strong> $ <?= number_format((float)$canchaPrecio, 2, ',', '.') ?></div>
                 <?php endif; ?>
             </div>
             <div style="display:flex; gap:10px; justify-content:space-between; margin-top:20px;">
@@ -132,5 +142,4 @@ try {
         <?php endif; ?>
     </div>
 </div>
-
-<?php include './../includes/footer.php'; ?>
+<?php include './../../includes/footer.php'; ?>
