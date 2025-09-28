@@ -4,6 +4,8 @@ declare(strict_types=1);
 require __DIR__ . '/../../../../config.php';
 require __DIR__ . '/../../../../../lib/util.php';
 require __DIR__ . '/../../../../../config.mercadopago.php';
+require __DIR__ . '/../../../includes/header.php';
+
 ensure_session();
 
 $reserva = $_SESSION['reserva'] ?? [];
@@ -24,7 +26,7 @@ if ($stmt = $conn->prepare("SELECT nombre, precio FROM canchas WHERE cancha_id =
 <head>
   <meta charset="utf-8"><title>Pagar con tarjeta</title>
   <style>
-    .page-wrap{max-width:720px;margin:24px auto;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+    .page-wrap{max-width:720px; margin: auto;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
     .hint{background:#0f172a;color:#e2e8f0;padding:8px 12px;border-radius:8px;margin:10px 0;font-size:14px}
     .btn{padding:10px 14px;border:0;border-radius:10px;cursor:pointer}
     .back{background:#334155;color:#fff}
@@ -38,14 +40,8 @@ if ($stmt = $conn->prepare("SELECT nombre, precio FROM canchas WHERE cancha_id =
   <h1 class="brand">Pagar con tarjeta</h1>
   <p><?= h($canchaNombre) ?> — <?= h($fecha) ?> <?= h($hora) ?> — <strong>$ <?= number_format($monto,2,',','.') ?></strong></p>
 
-  <div class="hint">
-    Modo: <b><?= h(MP_ENV) ?></b> — DEMO_FORCE: <b><?= defined('MP_DEMO_FORCE_APPROVED') && MP_DEMO_FORCE_APPROVED ? 'ON' : 'OFF' ?></b><br>
-    Sandbox (no cobra real). Tarjeta de prueba:
-    <code>4235647728025682</code> / CVV <code>123</code> / Vto <code>11/25</code> / DNI <code>12345678</code>.
-  </div>
-
-  <label style="display:block;margin:8px 0;">Email comprador (prueba)
-    <input id="buyerEmail" type="email" value="test_user_123@testuser.com" style="width:100%;max-width:360px;">
+  <label style="display:block;margin:8px 0;">Email comprador:
+    <input id="buyerEmail" type="email" value="cristianchejo55@gmail.com" style="width:100%;max-width:360px;">
   </label>
 
   <div id="alertBox" class="err"></div>
@@ -55,7 +51,6 @@ if ($stmt = $conn->prepare("SELECT nombre, precio FROM canchas WHERE cancha_id =
   <!-- estás en /php/cliente/reservas/logica/pagos/ -->
   <form id="cancel" method="get" action="../../steps/reservas.php" style="margin-top:16px;">
     <input type="hidden" name="cancha" value="<?= (int)$canchaId ?>">
-    <button type="submit" class="btn back">Cambiar horario</button>
   </form>
 </div>
 
@@ -112,3 +107,5 @@ if ($stmt = $conn->prepare("SELECT nombre, precio FROM canchas WHERE cancha_id =
 </script>
 </body>
 </html>
+
+<?php require __DIR__ . '/../../../includes/footer.php'; ?>
