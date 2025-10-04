@@ -40,7 +40,7 @@ if ($stmt = $conn->prepare("SELECT nombre, precio FROM canchas WHERE cancha_id =
   <h1 class="brand">Pagar con tarjeta</h1>
   <p><?= h($canchaNombre) ?> — <?= h($fecha) ?> <?= h($hora) ?> — <strong>$ <?= number_format($monto,2,',','.') ?></strong></p>
 
-  <label style="display:block;margin:8px 0;">Email comprador:
+  <label style="visibility: hidden;">Email comprador:
     <input id="buyerEmail" type="email" value="cristianchejo55@gmail.com" style="width:100%;max-width:360px;">
   </label>
 
