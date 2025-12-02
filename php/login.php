@@ -10,12 +10,16 @@ if (isset($_SESSION['usuario_id']) && isset($_SESSION['rol'])) {
         case 'cliente':
             header("Location: /php/cliente/home_cliente.php");
             break;
+        case 'proveedor':
+            header("Location: /php/proveedor/home_proveedor.php");
+            break;
         default:
-            header("Location: /php/proveedor/home_cliente.php");
+            header("Location: /php/cliente/home_cliente.php");
             break;
     }
     exit();
 }
+
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];

@@ -1,3 +1,7 @@
+// Ingresar como proveedor
+Email: proveedor@gmail.com
+Contraseña: proveedor123
+
 // Ingresar como administrador
 Email: admin@goatsport.com
 Contraseña: admin123
