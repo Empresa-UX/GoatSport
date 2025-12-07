@@ -3,24 +3,33 @@ include './../includes/header.php';
 include './../includes/sidebar.php';
 include './../../config.php';
 
-$partido_id = $_GET['partido_id'] ?? null;
-$torneo_id = $jugador1_id = $jugador2_id = $fecha = $resultado = '';
-$accion = 'add';
+$partido_id   = $_GET['partido_id'] ?? null;
+$torneo_id    = '';
+$jugador1_id  = '';
+$jugador2_id  = '';
+$fecha        = '';
+$resultado    = '';
+$ganador_id   = '';
+$reserva_id   = '';
+
+$accion    = 'add';
 $formTitle = 'Agregar Partido';
 
-if($partido_id){
+if ($partido_id){
     $stmt = $conn->prepare("SELECT * FROM partidos WHERE partido_id=?");
     $stmt->bind_param("i", $partido_id);
     $stmt->execute();
     $result = $stmt->get_result();
     if($row = $result->fetch_assoc()){
-        $torneo_id = $row['torneo_id'];
-        $jugador1_id = $row['jugador1_id'];
-        $jugador2_id = $row['jugador2_id'];
-        $fecha = $row['fecha'];
-        $resultado = $row['resultado'];
-        $accion = 'edit';
-        $formTitle = 'Editar Partido';
+        $torneo_id    = $row['torneo_id'];
+        $jugador1_id  = $row['jugador1_id'];
+        $jugador2_id  = $row['jugador2_id'];
+        $fecha        = $row['fecha'];
+        $resultado    = $row['resultado'];
+        $ganador_id   = $row['ganador_id'];
+        $reserva_id   = $row['reserva_id'];
+        $accion       = 'edit';
+        $formTitle    = 'Editar Partido';
     }
     $stmt->close();
 }
@@ -60,8 +69,8 @@ if($partido_id){
         <label>Jugador 2:</label>
         <select name="jugador2_id" required>
             <?php
-            $usuarios->data_seek(0);
-            while($u = $usuarios->fetch_assoc()):
+            $usuarios2 = $conn->query("SELECT user_id, nombre FROM usuarios ORDER BY nombre ASC");
+            while($u = $usuarios2->fetch_assoc()):
             ?>
                 <option value="<?= $u['user_id'] ?>" <?= ($u['user_id']==$jugador2_id)?'selected':'' ?>>
                     <?= htmlspecialchars($u['nombre']) ?>
@@ -69,12 +78,15 @@ if($partido_id){
             <?php endwhile; ?>
         </select>
 
-        <label>Fecha:</label>
-        <input type="date" name="fecha" 
-            value="<?= $fecha ? date('Y-m-d', strtotime($fecha)) : '' ?>">
+        <label>Fecha y hora:</label>
+        <input type="datetime-local" name="fecha"
+            value="<?= $fecha ? date('Y-m-d\TH:i', strtotime($fecha)) : '' ?>">
+
+        <label>Reserva (opcional):</label>
+        <input type="number" name="reserva_id" placeholder="ID de reserva" value="<?= $reserva_id ?>">
 
         <label>Resultado:</label>
-        <input type="text" name="resultado" value="<?= $resultado ?>">
+        <input type="text" name="resultado" value="<?= $resultado ?>" placeholder="Ej: 6-4 6-3 J1">
 
         <button type="submit" class="btn-add"><?= $formTitle ?></button>
     </form>

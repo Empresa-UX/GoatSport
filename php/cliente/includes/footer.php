@@ -1,7 +1,7 @@
 </main>
 
 <footer>
-    <p>Padel Alquiler © <?= date("Y"); ?> - Todos los derechos reservados</p>
+    <p>Goat Sport © <?= date("Y"); ?> - Todos los derechos reservados</p>
 </footer>
 
 </body>

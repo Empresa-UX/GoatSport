@@ -3,34 +3,79 @@ include './../../config.php';
 
 $action = $_REQUEST['action'] ?? '';
 
-if($action == 'add'){
-    $stmt = $conn->prepare("INSERT INTO usuarios (nombre, email, contrasenia, rol, puntos) VALUES (?,?,?,?,?)");
-    $rol = 'cliente';
-    $stmt->bind_param("ssssi", $_POST['nombre'], $_POST['email'], $_POST['contrasenia'], $rol, $_POST['puntos']);
+if ($action === 'add') {
+    $nombre      = $_POST['nombre']      ?? '';
+    $email       = $_POST['email']       ?? '';
+    $contrasenia = $_POST['contrasenia'] ?? '';
+    $puntos      = (int)($_POST['puntos'] ?? 0);
+    $rol         = 'cliente';
+
+    $sql = "INSERT INTO usuarios (nombre, email, contrasenia, rol, puntos)
+            VALUES (?,?,?,?,?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ssssi", $nombre, $email, $contrasenia, $rol, $puntos);
     $stmt->execute();
     $stmt->close();
+
     header('Location: usuarios.php');
+    exit;
 }
 
-if($action == 'edit'){
-    $stmt = $conn->prepare("UPDATE usuarios SET nombre=?, email=?, contrasenia=?, puntos=? WHERE user_id=?");
-    $stmt->bind_param("sssii", $_POST['nombre'], $_POST['email'], $_POST['contrasenia'], $_POST['puntos'], $_POST['user_id']);
+if ($action === 'edit') {
+    $user_id     = (int)($_POST['user_id'] ?? 0);
+    $nombre      = $_POST['nombre']      ?? '';
+    $email       = $_POST['email']       ?? '';
+    $contrasenia = $_POST['contrasenia'] ?? '';
+    $puntos      = (int)($_POST['puntos'] ?? 0);
+
+    if ($user_id <= 0) {
+        header('Location: usuarios.php');
+        exit;
+    }
+
+    $sql = "UPDATE usuarios 
+            SET nombre = ?, email = ?, contrasenia = ?, puntos = ?
+            WHERE user_id = ? AND rol = 'cliente'";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("sssii", $nombre, $email, $contrasenia, $puntos, $user_id);
     $stmt->execute();
     $stmt->close();
+
     header('Location: usuarios.php');
+    exit;
 }
 
-if($action == 'delete'){
-    $stmt = $conn->prepare("DELETE FROM usuarios WHERE user_id=?");
-    $stmt->bind_param("i", $_POST['user_id']);
-    $stmt->execute();
-    $stmt->close();
+if ($action === 'delete') {
+    $user_id = (int)($_POST['user_id'] ?? 0);
+
+    if ($user_id > 0) {
+        $stmt = $conn->prepare("DELETE FROM usuarios WHERE user_id = ? AND rol = 'cliente'");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
     header('Location: usuarios.php');
+    exit;
 }
 
-if($action == 'get'){
-    $id = $_GET['id'];
-    $result = $conn->query("SELECT * FROM usuarios WHERE user_id=$id");
-    echo json_encode($result->fetch_assoc());
+if ($action === 'get') {
+    $id = (int)($_GET['id'] ?? 0);
+    $data = null;
+    if ($id > 0) {
+        $stmt = $conn->prepare("SELECT * FROM usuarios WHERE user_id = ? AND rol = 'cliente'");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $data = $res->fetch_assoc();
+        $stmt->close();
+    }
+    header('Content-Type: application/json');
+    echo json_encode($data);
+    exit;
 }
-?>
+
+// fallback
+header('Location: usuarios.php');
+exit;

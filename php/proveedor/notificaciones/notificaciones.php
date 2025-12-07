@@ -170,7 +170,7 @@ $stmt->close();
             <th>Mensaje</th>
             <th>Tipo</th>
             <th>Estado</th>
-            <th>Acciones</th>
+            <th>Leído</th>
         </tr>
 
         <?php if ($notis->num_rows > 0): ?>

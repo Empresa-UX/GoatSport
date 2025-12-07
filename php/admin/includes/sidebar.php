@@ -8,6 +8,7 @@
     <a href="/php/admin/pagos/pagos.php">Pagos</a>
     <a href="/php/admin/reservas/reservas.php">Reservas</a>
     <a href="/php/admin/partidos/partidos.php">Partidos</a>
+        <a href="/php/admin/notificaciones/notificaciones.php">Notificaciones</a>
     <a href="/php/admin/torneos/torneos.php">Torneos</a>
     <a href="/php/logout.php">Cerrar sesión</a>
 </aside>
@@ -15,5 +16,7 @@
 <div class="main">
     <div class="main-inner">
         <div class="header">
-            <div class="user">👤 Administrador</div>
+            <a href="/php/admin/configuracion/configuracion.php" style="text-decoration:none;">
+                <div class="user">👤 Administrador</div>
+            </a>
         </div>
