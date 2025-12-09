@@ -131,6 +131,20 @@ if ($action === 'toggle') {
     exit;
 }
 
+if ($_POST['action'] == 'aprobar') {
+    $id = intval($_POST['cancha_id']);
+    $conn->query("UPDATE canchas SET estado='aprobado' WHERE cancha_id=$id");
+    header("Location: ../canchasDisponibles/canchasDisponibles.php");
+    exit;
+}
+
+if ($_POST['action'] == 'denegar') {
+    $id = intval($_POST['cancha_id']);
+    $conn->query("UPDATE canchas SET estado='denegado' WHERE cancha_id=$id");
+    header("Location: ../canchasDisponibles/canchasDisponibles.php");
+    exit;
+}
+
 // fallback
 header('Location: canchas.php');
 exit;
