@@ -169,7 +169,40 @@ $result = $stmt->get_result();
                         <small><?= htmlspecialchars($n['mensaje']) ?></small>
                     </td>
                     <td><?= htmlspecialchars($n['tipo']) ?></td>
-                    <td><span class="status-pill <?= $pillClass ?>"><?= $estadoTxt ?></span></td>
+                    <td>
+                        <span class="status-pill <?= $pillClass ?>"><?= $estadoTxt ?></span>
+
+                        <!-- Botón para cambiar estado -->
+                        <form action="marcar_leida.php" method="POST" style="display:inline;">
+                            <input type="hidden" name="id" value="<?= $n['notificacion_id'] ?>">
+
+                            <?php if ($n['leida'] == 0): ?>
+                                <button style="
+                                    margin-left:6px; 
+                                    padding:4px 8px; 
+                                    font-size:11px; 
+                                    background:#0a7c0a; 
+                                    color:#fff; 
+                                    border:none; 
+                                    border-radius:5px;
+                                    cursor:pointer;">
+                                    Marcar leída
+                                </button>
+                            <?php else: ?>
+                                <button style="
+                                    margin-left:6px; 
+                                    padding:4px 8px; 
+                                    font-size:11px; 
+                                    background:#999; 
+                                    color:#fff; 
+                                    border:none; 
+                                    border-radius:5px;
+                                    cursor:pointer;">
+                                    Marcar NO leída
+                                </button>
+                            <?php endif; ?>
+                        </form>
+                    </td>
                 </tr>
             <?php endwhile; ?>
         <?php else: ?>

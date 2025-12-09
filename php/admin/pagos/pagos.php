@@ -8,7 +8,6 @@ include './../../config.php';
 <div class="section">
     <div class="section-header">
         <h2>Pagos</h2>
-        <button onclick="location.href='pagosForm.php'" class="btn-add">Registrar pago</button>
     </div>
 
     <style>
@@ -43,7 +42,6 @@ include './../../config.php';
             <th>Monto</th>
             <th>Estado</th>
             <th>Fecha de pago</th>
-            <th>Acciones</th>
         </tr>
 
         <?php
@@ -110,17 +108,6 @@ include './../../config.php';
                     <td>$<?= number_format($row['monto'], 2, ',', '.') ?></td>
                     <td><span class="status-pill <?= $estadoClass ?>"><?= ucfirst($row['estado']) ?></span></td>
                     <td><?= $fechaPago ?></td>
-                    <td>
-                        <button class="btn-action edit"
-                            onclick="location.href='pagosForm.php?pago_id=<?= $row['pago_id'] ?>'">✏️</button>
-
-                        <form method="POST" action="pagosAction.php" style="display:inline-block;"
-                            onsubmit="return confirm('¿Seguro que quieres eliminar este pago?');">
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="pago_id" value="<?= $row['pago_id'] ?>">
-                            <button type="submit" class="btn-action delete">🗑️</button>
-                        </form>
-                    </td>
                 </tr>
                 <?php
             endwhile;

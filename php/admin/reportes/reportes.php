@@ -8,7 +8,6 @@ include './../../config.php';
 <div class="section">
     <div class="section-header">
         <h2>Reportes</h2>
-        <button onclick="location.href='reportesForm.php'" class="btn-add">Agregar reporte</button>
     </div>
 
     <table>
@@ -20,7 +19,6 @@ include './../../config.php';
             <th>Reserva</th>
             <th>Fecha</th>
             <th>Estado</th>
-            <th>Acciones</th>
         </tr>
 
         <?php
@@ -56,18 +54,6 @@ include './../../config.php';
             <td><?= $row['fecha_reporte'] ?></td>
 
             <td><span class="status-pill <?= $estadoClass ?>"><?= $row['estado'] ?></span></td>
-
-            <td>
-                <button class="btn-action edit"
-                        onclick="location.href='reportesForm.php?id=<?= $row['id'] ?>'">✏️</button>
-
-                <form method="POST" action="reportesAction.php" style="display:inline-block;"
-                      onsubmit="return confirm('¿Eliminar este reporte?');">
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="id" value="<?= $row['id'] ?>">
-                    <button type="submit" class="btn-action delete">🗑️</button>
-                </form>
-            </td>
         </tr>
         <?php endwhile; else: ?>
         <tr>

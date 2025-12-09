@@ -1,10 +1,10 @@
 <aside class="sidebar">
     <img src="/img/logotipo.png" alt="Logo Padel">
     <a href="/php/admin/canchas/canchas.php">Canchas</a>
+    <a href="/php/admin/canchasDisponibles/canchasDisponibles.php">Canchas A Definir</a>
     <a href="/php/admin/usuarios/usuarios.php">Usuarios</a>
     <a href="/php/admin/proveedores/proveedores.php">Proveedores</a>
     <a href="/php/admin/reportes/reportes.php">Reportes</a>
-    <a href="/php/admin/ranking/ranking.php">Ranking</a>
     <a href="/php/admin/pagos/pagos.php">Pagos</a>
     <a href="/php/admin/reservas/reservas.php">Reservas</a>
     <a href="/php/admin/partidos/partidos.php">Partidos</a>

@@ -22,8 +22,10 @@ $sql = "
         (SELECT COUNT(*) FROM reservas r WHERE r.cancha_id = c.cancha_id) AS total_reservas
     FROM canchas c
     INNER JOIN usuarios u ON u.user_id = c.proveedor_id
+    WHERE c.estado = 'aprobado'
     ORDER BY c.nombre ASC
 ";
+
 
 $result = $conn->query($sql);
 ?>
@@ -31,7 +33,6 @@ $result = $conn->query($sql);
 <div class="section">
     <div class="section-header">
         <h2>Canchas</h2>
-        <button onclick="location.href='canchasForm.php'" class="btn-add">Agregar Cancha</button>
     </div>
 
     <style>
@@ -56,7 +57,6 @@ $result = $conn->query($sql);
             <th>Horario</th>
             <th>Estado</th>
             <th>Reservas</th>
-            <th>Acciones</th>
         </tr>
 
         <?php if ($result && $result->num_rows > 0): ?>
@@ -91,28 +91,6 @@ $result = $conn->query($sql);
                     </td>
 
                     <td><?= (int)$c['total_reservas'] ?></td>
-
-                    <td>
-                        <!-- Editar -->
-                        <button class="btn-action edit"
-                            onclick="location.href='canchasForm.php?cancha_id=<?= $c['cancha_id'] ?>'">✏️</button>
-
-                        <!-- Eliminar -->
-                        <form method="POST" action="canchasAction.php" style="display:inline-block;"
-                              onsubmit="return confirm('¿Seguro que quieres eliminar esta cancha?');">
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="cancha_id" value="<?= $c['cancha_id'] ?>">
-                            <button type="submit" class="btn-action delete">🗑️</button>
-                        </form>
-
-                        <!-- Activar / desactivar -->
-                        <form method="POST" action="canchasAction.php" style="display:inline-block;">
-                            <input type="hidden" name="action" value="toggle">
-                            <input type="hidden" name="cancha_id" value="<?= $c['cancha_id'] ?>">
-                            <button type="submit" class="btn-action" title="Activar / desactivar"
-                                    style="background:#ccc;">🔁</button>
-                        </form>
-                    </td>
                 </tr>
             <?php endwhile; ?>
         <?php else: ?>
