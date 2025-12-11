@@ -15,7 +15,6 @@
 
     <a href="/php/admin/canchas/canchas.php">Canchas</a>
     <a href="/php/admin/usuarios/usuarios.php">Usuarios</a>
-    <a href="/php/admin/proveedores/proveedores.php">Proveedores</a>
     <a href="/php/admin/reportes/reportes.php">Reportes</a>
     <a href="/php/admin/pagos/pagos.php">Pagos</a>
     <a href="/php/admin/reservas/reservas.php">Reservas</a>
