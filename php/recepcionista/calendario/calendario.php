@@ -210,7 +210,8 @@ foreach ($blocks_evt as $b) {
 
       /* Vista Día */
       .day-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);display:grid;grid-template-columns:80px 1fr}
-      .day-times{border-right:1px dashed #e5e7eb;position:relative;margin-top:50px;margin-bottom:30px}
+      .day-wrap > *{ padding-top:50px; padding-bottom:30px; margin-top: 50px; margin-bottom: 50px;} /* por qué: evita que 07:00 quede detrás de filtros y alinea selección */
+      .day-times{border-right:1px dashed #e5e7eb;position:relative;margin-bottom:30px}
       .day-grid{position:relative;padding-top:18px;padding-bottom:24px}
       .hr{position:absolute;left:0;right:0;height:1px;background:#eef2f7}
       .hr-label{position:absolute;right:8px;top:-8px;font-size:11px;color:#6b7280}
@@ -449,6 +450,19 @@ foreach ($blocks_evt as $b) {
           window.location.href = url.toString();
           clearDraft();
         });
+
+        window.addEventListener('keydown', (e) => {
+              // por qué: permite salir rápido sin usar click derecho
+              if (e.key === 'Escape' || e.key === 'Esc') {
+                if (dragging || draft) {
+                  dragging = false;
+                  clearDraft();
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }
+            });
+
       })();
     </script>
   </div>
