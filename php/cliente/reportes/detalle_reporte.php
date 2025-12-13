@@ -1,6 +1,6 @@
 <?php
 /* =========================================================================
- * FILE: C:\Users\Gustavo\Desktop\Cristian\Proyectos\GoatSport\php\cliente\reportes\detalle_reporte.php
+ * FILE: detalle_reporte.php
  * ========================================================================= */
 include './../../config.php';
 include './../includes/header.php';
@@ -13,7 +13,7 @@ $userId = (int)$_SESSION['usuario_id'];
 $id     = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($id <= 0) { header("Location: /php/cliente/reportes/historial_reportes.php"); exit; }
 
-/* Reporte del usuario + info cancha/club/reserva */
+/* Reporte del usuario + info cancha/club */
 $sql = "
   SELECT rep.*, c.nombre AS cancha_nombre, c.ubicacion,
          u.nombre AS club_nombre
@@ -35,76 +35,79 @@ if (!$rep) {
   exit;
 }
 
-function badge_estado($estado){
-  $base='display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid;';
-  if ($estado === 'Pendiente') return '<span style="'.$base.'background:#fff6e5;color:#8a5a00;border-color:#f5d49a">Pendiente</span>';
-  return '<span style="'.$base.'background:#e6fff5;color:#0d6b4d;border-color:#a5e4c8">Resuelto</span>';
+function fmt_dia_mes(string $ymd): string {
+  $ts = strtotime($ymd);
+  return $ts ? date('d/m', $ts) : $ymd;
+}
+function label_razon(?string $t): string {
+  return ($t==='sistema') ? 'Sistema' : 'Cancha';
 }
 ?>
 <style>
-/* Layout: Detalle más ancho, Información más angosta */
-.grid{display:grid;grid-template-columns:1.6fr 0.8fr;gap:40px;align-items:start}
-@media (max-width:900px){.grid{grid-template-columns:1fr;gap:20px}}
-/* Tablas consistentes con tu UI */
-table{width:100%;border-collapse:collapse;font-size:17px}
-th,td{padding:12px 14px;border-bottom:1px solid rgba(0,0,0,0.08);text-align:left}
-.label-stat{font-weight:600;width:100px;white-space:nowrap}
-.value-stat{word-break:break-word}
-/* Textos largos: mejor legibilidad */
-.prose-box{white-space:pre-wrap;word-break:break-word;line-height:1.55}
-.subtle{color:#5a6b6c;font-size:13px}
+.page-wrap{ padding:24px 16px 40px; }
+.card-white{ max-width:1200px; margin:0 auto 24px auto; }
+
+.grid{ display:grid; grid-template-columns:1.3fr 0.7fr; gap:40px; align-items:start; }
+@media (max-width:900px){ .grid{ grid-template-columns:1fr; gap:20px; } }
+
+/* Tabla consistente con Reservas */
+table{ width:100%; border-collapse:separate; border-spacing:0; font-size:17px; }
+thead th{ text-align:left; padding:12px 14px; color:#2a4e51; border-bottom:2px solid #e1ecec; font-weight:700; }
+tbody td{ text-align:left; padding:12px 14px; border-bottom:1px solid #f0f5f5; }
+tbody tr:hover{ background:#f7fafb; }
+.label-stat{ font-weight:600; white-space:nowrap; width:140px; }
+.value-stat{ word-break:break-word; }
+
+/* Caja de descripción */
+.prose-box{
+  white-space:pre-wrap; word-break:break-word; line-height:1.55; padding:12px 14px; border-radius:10px;
+  border:1px solid #e6ecec; background:#fcfdfd;
+}
+
+/* CTA */
+.cta{ text-align:center; margin-top:16px; }
+.btn-outline{
+  padding:10px 16px; border:1.5px solid #1bab9d; background:#fff; color:#1bab9d;
+  border-radius:10px; cursor:pointer; font-weight:700; text-decoration:none; display:inline-block;
+}
+.btn-outline:hover{ background:rgba(27,171,157,.08); }
 </style>
 
 <div class="page-wrap">
-  <h1 class="page-title">Detalle del reporte #<?= (int)$rep['id'] ?></h1>
+  <h1 class="page-title">Detalle del reporte</h1>
 
   <div class="grid">
-    <!-- Primero: Detalle (más ancho) -->
+    <!-- Columna izquierda: Descripción -->
     <div>
-      <h2 class="section-title">Detalle</h2>
+      <h2 class="section-title">Descripción</h2>
       <div class="card-white">
-        <table>
-          <tbody>
-            <tr>
-              <td class="label-stat">Descripción</td>
-              <td class="value-stat"><div class="prose-box"><?= htmlspecialchars($rep['descripcion']) ?></div></td>
-            </tr>
-            <tr>
-              <td class="label-stat">Respuesta del club</td>
-              <td class="value-stat">
-                <div class="prose-box">
-                  <?= $rep['respuesta_proveedor'] ? htmlspecialchars($rep['respuesta_proveedor']) : 'Aún no hay respuesta.' ?>
-                </div>
-                <?php if ($rep['estado']==='Resuelto'): ?>
-                  <div class="subtle" style="margin-top:6px;">Estado: Resuelto</div>
-                <?php endif; ?>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="prose-box"><?= htmlspecialchars($rep['descripcion']) ?></div>
       </div>
     </div>
 
-    <!-- Segundo: Información (más angosto) -->
+    <!-- Columna derecha: Información -->
     <div>
       <h2 class="section-title">Información</h2>
       <div class="card-white">
         <table>
           <tbody>
             <tr><td class="label-stat">Título</td><td class="value-stat"><?= htmlspecialchars($rep['nombre_reporte']) ?></td></tr>
-            <tr><td class="label-stat">Estado</td><td class="value-stat"><?= badge_estado($rep['estado']) ?></td></tr>
-            <tr><td class="label-stat">Fecha</td><td class="value-stat"><?= htmlspecialchars($rep['fecha_reporte']) ?></td></tr>
+            <tr><td class="label-stat">Razón</td><td class="value-stat"><?= htmlspecialchars(label_razon($rep['tipo_falla'])) ?></td></tr>
+            <tr><td class="label-stat">Estado</td><td class="value-stat"><?= htmlspecialchars($rep['estado']) ?></td></tr>
+            <tr><td class="label-stat">Fecha</td><td class="value-stat"><?= fmt_dia_mes($rep['fecha_reporte']) ?></td></tr>
             <tr><td class="label-stat">Club</td><td class="value-stat"><?= htmlspecialchars($rep['club_nombre'] ?? '—') ?></td></tr>
             <tr><td class="label-stat">Cancha</td><td class="value-stat"><?= htmlspecialchars($rep['cancha_nombre'] ?? '—') ?></td></tr>
-            <tr><td class="label-stat">Reserva</td><td class="value-stat"><?= $rep['reserva_id'] ? '#'.(int)$rep['reserva_id'] : '—' ?></td></tr>
+            <?php if (!empty($rep['reserva_id'])): ?>
+              <tr><td class="label-stat">Reserva</td><td class="value-stat">#<?= (int)$rep['reserva_id'] ?></td></tr>
+            <?php endif; ?>
           </tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <div style="text-align:center; margin-top:16px;">
-    <a class="btn-add" href="/php/cliente/reportes/historial_reportes.php" style="text-decoration:none;display:inline-block;padding:10px 18px;">Volver al historial</a>
+  <div class="cta">
+    <a class="btn-outline" href="/php/cliente/reportes/historial_reportes.php">Volver al historial</a>
   </div>
 </div>
 

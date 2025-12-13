@@ -5,9 +5,7 @@
 session_start();
 include '../../config.php';
 
-if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== 'cliente') {
-    header("Location: /php/login.php"); exit;
-}
+if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== 'cliente') { header("Location: /php/login.php"); exit; }
 
 $cliente_id = (int)$_SESSION['usuario_id'];
 $torneo_id  = isset($_POST['torneo_id']) ? (int)$_POST['torneo_id'] : 0;

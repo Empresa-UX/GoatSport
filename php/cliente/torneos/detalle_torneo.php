@@ -1,6 +1,7 @@
 <?php
 /* =========================================================================
  * FILE: C:\Users\Gustavo\Desktop\Cristian\Proyectos\GoatSport\php\cliente\torneos\detalle_torneo.php
+ * (Patch de UI: etiquetas en negrita como en Detalle de Reservas)
  * ========================================================================= */
 include './../../config.php';
 include './../includes/header.php';
@@ -11,38 +12,26 @@ $userId   = (int)$_SESSION['usuario_id'];
 $torneoId = isset($_GET['torneo_id']) ? (int)$_GET['torneo_id'] : 0;
 if ($torneoId <= 0) { header("Location: /php/cliente/torneos/torneos.php"); exit; }
 
-/* helpers */
+/* Helpers */
 function fmt_md(string $d): string {
     if (!$d) return '—';
     [$y,$m,$day] = explode('-', $d);
     $mes = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][(int)$m] ?? '';
     return (int)$day.' '.$mes;
 }
-function comienza_label($n){
-  if ($n === null) return '—';
-  $n = (int)$n;
-  if ($n > 1) return "Comienza en $n días";
-  if ($n === 1) return "Comienza mañana";
-  if ($n === 0) return "Comienza hoy";
-  return "Terminado";
-}
-function badge_estado($e){
-  $base='display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid;';
-  if($e==='abierto') return '<span style="'.$base.'background:#e6fff5;color:#0d6b4d;border-color:#a5e4c8">abierto</span>';
-  if($e==='cerrado') return '<span style="'.$base.'background:#fff6e5;color:#8a5a00;border-color:#f5d49a">cerrado</span>';
-  return '<span style="'.$base.'background:#f2f4f7;color:#5b5b5b;border-color:#d8dde3">finalizado</span>';
+function tipo_label(?string $t): string {
+    $t = strtolower((string)$t);
+    return $t==='equipo' ? 'Equipo' : ($t==='individual' ? 'Individual' : ucfirst($t));
 }
 
 /* Torneo */
 $sql = "
   SELECT
-    t.torneo_id, t.nombre, t.fecha_inicio, t.fecha_fin, t.estado,
-    t.proveedor_id, COALESCE(prov.nombre,'—') AS club,
-    DATEDIFF(t.fecha_inicio, CURDATE()) AS comienza_en
+    t.torneo_id, t.nombre, t.fecha_inicio, t.fecha_fin, t.estado, t.tipo, t.capacidad,
+    COALESCE(prov.nombre,'—') AS club
   FROM torneos t
   LEFT JOIN usuarios prov ON prov.user_id = t.proveedor_id
-  WHERE t.torneo_id=?
-  LIMIT 1
+  WHERE t.torneo_id=? LIMIT 1
 ";
 $st = $conn->prepare($sql);
 $st->bind_param("i", $torneoId);
@@ -51,9 +40,10 @@ $torneo = $st->get_result()->fetch_assoc();
 $st->close();
 if (!$torneo) { header("Location: /php/cliente/torneos/torneos.php"); exit; }
 
-/* Participantes */
+/* Participantes con email */
+$participants = [];
 $stP = $conn->prepare("
-  SELECT u.user_id, u.nombre
+  SELECT u.user_id, u.nombre, u.email
   FROM participaciones p
   JOIN usuarios u ON u.user_id = p.jugador_id
   WHERE p.torneo_id=? AND p.estado='aceptada'
@@ -64,86 +54,109 @@ $stP->execute();
 $participants = $stP->get_result()->fetch_all(MYSQLI_ASSOC);
 $stP->close();
 
-$isJoined = false;
-foreach ($participants as $pp) { if ((int)$pp['user_id'] === $userId) { $isJoined=true; break; } }
-
-$okMsg  = isset($_GET['ok'])  ? trim($_GET['ok'])  : '';
-$errMsg = isset($_GET['err']) ? trim($_GET['err']) : '';
+/* Ganador si finalizado (heurística simple por cantidad de victorias) */
+$ganador = null;
+if ($torneo['estado'] === 'finalizado') {
+    $stG = $conn->prepare("
+      SELECT u.user_id, u.nombre, u.email, COUNT(*) AS wins
+      FROM partidos pa
+      JOIN usuarios u ON u.user_id = pa.ganador_id
+      WHERE pa.torneo_id=? AND pa.ganador_id IS NOT NULL
+      GROUP BY u.user_id, u.nombre, u.email
+      ORDER BY wins DESC
+      LIMIT 1
+    ");
+    $stG->bind_param("i", $torneoId);
+    $stG->execute();
+    $ganador = $stG->get_result()->fetch_assoc();
+    $stG->close();
+}
 ?>
 <style>
-table tbody tr:hover{background:#f7fafb}
-.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.btn{padding:10px 14px;border:none;background:#07566b;color:#fff;border-radius:10px;cursor:pointer;font-weight:700}
-.btn-outline{padding:10px 14px;border:1.5px solid #1bab9d;background:#fff;color:#1bab9d;border-radius:10px;cursor:pointer;font-weight:700;text-decoration:none;display:inline-block}
-.btn-outline:hover{background:rgba(27,171,157,.08)}
-.cta-wrap{margin-top:16px;text-align:center}
-.grid{display:grid;grid-template-columns:1.3fr 0.7fr;gap:40px}
-@media (max-width:900px){.grid{grid-template-columns:1fr}}
+/* ====== Estilo consistente con Detalle de Reservas ====== */
+.page-wrap{ padding:24px 16px 40px; }
+.card-white{ max-width:1280px; margin:0 auto 24px auto; }
+.card-white .section-title{ font-size:26px; font-weight:700; color:var(--text-dark); margin:0 0 8px; }
+
+.detail-2col{ display:grid; grid-template-columns:1.3fr 0.7fr; gap:40px; }
+@media (max-width:900px){ .detail-2col{ grid-template-columns:1fr; } }
+
+table{ width:100%; border-collapse:separate; border-spacing:0; }
+table thead th{ text-align:left; padding:12px 14px; color:#2a4e51; border-bottom:2px solid #e1ecec; font-weight:700; }
+table tbody td{ text-align:left; padding:12px 14px; border-bottom:1px solid #f0f5f5; }
+table tbody tr:hover{ background:#f7fafb; }
+
+/* Igual que Reservas: la etiqueta a la izquierda va más fuerte */
+.label-stat{ font-weight:600; }
+
+/* Botones base igual que Reservas */
+.cta-wrap{ margin-top:18px; text-align:center; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+.btn-outline{
+  padding:10px 16px; border:1.5px solid #1bab9d; background:#fff; color:#1bab9d;
+  border-radius:10px; cursor:pointer; font-weight:700; text-decoration:none; display:inline-block;
+}
+.btn-outline:hover{ background:rgba(27,171,157,.08); }
 </style>
 
 <div class="page-wrap">
-  <h1 class="page-title">Detalle del torneo</h1>
+  <h1 class="page-title" style="text-align:center;">Detalle del torneo</h1>
 
-  <div class="card-white" style="margin-bottom:12px; display:none" id="alertBox"></div>
-
-  <div class="grid">
-    <div>
+  <?php if ($torneo['estado'] === 'finalizado'): ?>
+    <div class="card-white">
       <h2 class="section-title">Información</h2>
-      <div class="card-white">
-        <table>
-          <tbody>
-            <tr><td class="label-stat">Nombre</td><td class="value-stat"><?= htmlspecialchars($torneo['nombre']) ?></td></tr>
-            <tr><td class="label-stat">Club</td><td class="value-stat"><?= htmlspecialchars($torneo['club']) ?></td></tr>
-            <tr><td class="label-stat">Estado</td><td class="value-stat"><?= badge_estado($torneo['estado']) ?></td></tr>
-            <tr><td class="label-stat">Inicio</td><td class="value-stat"><?= fmt_md($torneo['fecha_inicio']) ?></td></tr>
-            <tr><td class="label-stat">Fin</td><td class="value-stat"><?= fmt_md($torneo['fecha_fin']) ?></td></tr>
-            <tr><td class="label-stat">Comienza</td><td class="value-stat"><?= comienza_label($torneo['comienza_en']) ?></td></tr>
-          </tbody>
-        </table>
-        <div class="actions" style="margin-top:10px">
-          <?php if ($torneo['estado']==='abierto' && !$isJoined): ?>
-            <form method="post" action="/php/cliente/torneos/unirseTorneo.php">
-              <input type="hidden" name="torneo_id" value="<?= (int)$torneo['torneo_id'] ?>">
-              <input type="hidden" name="return" value="/php/cliente/torneos/detalle_torneo.php?torneo_id=<?= (int)$torneo['torneo_id'] ?>">
-              <button type="submit" class="btn">Unirme</button>
-            </form>
-          <?php endif; ?>
-          <?php if ($isJoined): ?>
-            <form method="post" action="/php/cliente/torneos/salirTorneo.php" onsubmit="return confirm('¿Salir del torneo?');">
-              <input type="hidden" name="torneo_id" value="<?= (int)$torneo['torneo_id'] ?>">
-              <button type="submit" class="btn-outline">Salir</button>
-            </form>
-          <?php endif; ?>
+      <table>
+        <tbody>
+          <tr><td class="label-stat">Nombre</td><td><?= htmlspecialchars($torneo['nombre']) ?></td></tr>
+          <tr><td class="label-stat">Club</td><td><?= htmlspecialchars($torneo['club']) ?></td></tr>
+          <tr><td class="label-stat">Fecha inicio</td><td><?= fmt_md($torneo['fecha_inicio']) ?></td></tr>
+          <tr><td class="label-stat">Fecha fin</td><td><?= fmt_md($torneo['fecha_fin']) ?></td></tr>
+          <tr><td class="label-stat">Tipo</td><td><?= tipo_label($torneo['tipo']) ?></td></tr>
+          <tr><td class="label-stat">Ganador</td><td><?= $ganador ? htmlspecialchars($ganador['nombre']) : '—' ?></td></tr>
+        </tbody>
+      </table>
+    </div>
+  <?php else: ?>
+    <div class="detail-2col">
+      <div>
+        <h2 class="section-title">Información</h2>
+        <div class="card-white">
+          <table>
+            <tbody>
+              <tr><td class="label-stat">Nombre</td><td><?= htmlspecialchars($torneo['nombre']) ?></td></tr>
+              <tr><td class="label-stat">Club</td><td><?= htmlspecialchars($torneo['club']) ?></td></tr>
+              <tr><td class="label-stat">Fecha inicio</td><td><?= fmt_md($torneo['fecha_inicio']) ?></td></tr>
+              <tr><td class="label-stat">Fecha fin</td><td><?= fmt_md($torneo['fecha_fin']) ?></td></tr>
+              <tr><td class="label-stat">Tipo</td><td><?= tipo_label($torneo['tipo']) ?></td></tr>
+              <tr><td class="label-stat">Capacidad</td><td><?= (int)$torneo['capacidad'] ?></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="section-title">Participantes (<?= count($participants) ?>)</h2>
+        <div class="card-white">
+          <table>
+            <thead><tr><th>Nombre</th><th>Email</th></tr></thead>
+            <tbody>
+              <?php if ($participants): foreach ($participants as $p): ?>
+                <tr>
+                  <td><?= htmlspecialchars($p['nombre']) ?><?= ((int)$p['user_id']===$userId)?' (tú)':'' ?></td>
+                  <td><?= htmlspecialchars($p['email']) ?></td>
+                </tr>
+              <?php endforeach; else: ?>
+                <tr><td colspan="2" style="text-align:center;">Aún no hay inscriptos</td></tr>
+              <?php endif; ?>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
-
-    <div>
-      <h2 class="section-title">Participantes (<?= count($participants) ?>)</h2>
-      <div class="card-white">
-        <table>
-          <thead><tr><th>Nombre</th></tr></thead>
-          <tbody>
-            <?php if ($participants): foreach ($participants as $p): ?>
-              <tr><td><?= htmlspecialchars($p['nombre']) ?><?= ((int)$p['user_id']===$userId)?' (tú)':'' ?></td></tr>
-            <?php endforeach; else: ?>
-              <tr><td style="text-align:center;">Aún no hay inscriptos</td></tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+  <?php endif; ?>
 
   <div class="cta-wrap">
     <a class="btn-outline" href="/php/cliente/torneos/torneos.php">Volver a torneos</a>
   </div>
 </div>
-
-<script>
-// alert() si vuelve con ?ok/err desde unirse/salir
-<?php if ($okMsg): ?> alert(<?= json_encode($okMsg) ?>); history.replaceState({}, '', window.location.pathname + window.location.search.replace(/(\?|&)ok=[^&]*/,'').replace(/\?&/,'?').replace(/\?$/,'')); <?php endif; ?>
-<?php if ($errMsg): ?> alert(<?= json_encode($errMsg) ?>); history.replaceState({}, '', window.location.pathname + window.location.search.replace(/(\?|&)err=[^&]*/,'').replace(/\?&/,'?').replace(/\?$/,'')); <?php endif; ?>
-</script>
 
 <?php include './../includes/footer.php'; ?>

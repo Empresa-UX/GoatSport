@@ -8,101 +8,62 @@ include './../includes/header.php';
 if ($_SESSION['rol'] !== 'cliente') { header("Location: /php/login.php"); exit; }
 
 $userId   = (int)$_SESSION['usuario_id'];
-$clubId   = isset($_GET['club_id']) ? (int)$_GET['club_id'] : 0;
 $pageSize = 4;
 $page     = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset   = ($page - 1) * $pageSize;
 
-// NUEVO: Variable para filtro de historial
+/* Vista: activos vs historial */
 $mostrarHistorial = isset($_GET['historial']) && $_GET['historial'] === '1';
 
-/* helpers */
+/* Helpers (fechas y etiquetas) */
 function fmt_md(string $d): string {
     if (!$d) return '—';
     [$y,$m,$day] = explode('-', $d);
     $mes = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][(int)$m] ?? '';
     return (int)$day.' '.$mes;
 }
-
-// FUNCIÓN IDÉNTICA A LA DE detalle_torneo.php
-if (!function_exists('comienza_label')) {
-    function comienza_label($n){
-        if ($n === null) return '—';
-        $n = (int)$n;
-        if ($n > 1) return "Comienza en $n días";
-        if ($n === 1) return "Comienza mañana";
-        if ($n === 0) return "Comienza hoy";
-        return "Terminado";
-    }
+function tipo_label(?string $t): string {
+    $t = strtolower((string)$t);
+    return $t==='equipo' ? 'Equipo' : ($t==='individual' ? 'Individual' : ucfirst($t));
 }
 
-/* Obtener todos los clubes para el dropdown */
-$clubes = [];
-$sqlClubes = "
-    SELECT DISTINCT u.user_id, u.nombre 
-    FROM usuarios u 
-    INNER JOIN torneos t ON t.proveedor_id = u.user_id 
-    WHERE u.rol = 'proveedor' 
-    ORDER BY u.nombre ASC
-";
-$resultClubes = $conn->query($sqlClubes);
-if ($resultClubes) {
-    while ($club = $resultClubes->fetch_assoc()) {
-        $clubes[] = $club;
-    }
-}
-
-/* Count */
+/* COUNT */
 $sqlCount = "
   SELECT COUNT(*) AS total
   FROM torneos t
-  LEFT JOIN usuarios prov ON prov.user_id = t.proveedor_id
-  WHERE 1=1
-  " . ($clubId > 0 ? " AND t.proveedor_id = ?" : "") . "
-  " . ($mostrarHistorial ? " AND t.fecha_inicio < CURDATE()" : " AND t.fecha_inicio >= CURDATE() AND t.estado IN ('abierto', 'cerrado')") . "
+  WHERE ".($mostrarHistorial ? "t.fecha_inicio < CURDATE()" : "t.fecha_inicio >= CURDATE() AND t.estado IN ('abierto','cerrado')")."
 ";
-
 $c = $conn->prepare($sqlCount);
-if ($clubId > 0) {
-    $c->bind_param("i", $clubId);
-}
 $c->execute();
 $total = (int)$c->get_result()->fetch_assoc()['total'];
 $c->close();
 $totalPages = max(1, (int)ceil($total / $pageSize));
 
-/* List */
+/* LISTA (datos necesarios para acciones) */
 $sql = "
   SELECT
-    t.torneo_id, t.nombre, t.fecha_inicio, t.fecha_fin, t.estado,
-    t.proveedor_id, COALESCE(prov.nombre,'—') AS club,
-    " . (!$mostrarHistorial ? "(SELECT COUNT(*) FROM participaciones p WHERE p.torneo_id=t.torneo_id AND p.estado='aceptada') AS inscriptos," : "") . "
+    t.torneo_id, t.nombre, t.fecha_inicio, t.fecha_fin, t.estado, t.tipo, t.capacidad,
+    COALESCE(prov.nombre,'—') AS club,
+    " . (!$mostrarHistorial ? "(SELECT COUNT(*) FROM participaciones p WHERE p.torneo_id=t.torneo_id AND p.estado='aceptada') AS inscriptos," : "0 AS inscriptos,") . "
     DATEDIFF(t.fecha_inicio, CURDATE()) AS comienza_en
   FROM torneos t
   LEFT JOIN usuarios prov ON prov.user_id = t.proveedor_id
-  WHERE 1=1
-  " . ($clubId > 0 ? " AND t.proveedor_id = ?" : "") . "
-  " . ($mostrarHistorial ? " AND t.fecha_inicio < CURDATE()" : " AND t.fecha_inicio >= CURDATE() AND t.estado IN ('abierto', 'cerrado')") . "
-  ORDER BY " . ($mostrarHistorial ? "t.fecha_inicio DESC" : "t.estado='abierto' DESC, t.fecha_inicio ASC") . ", t.torneo_id DESC
+  WHERE ".($mostrarHistorial ? "t.fecha_inicio < CURDATE()" : "t.fecha_inicio >= CURDATE() AND t.estado IN ('abierto','cerrado')")."
+  ORDER BY ".($mostrarHistorial ? "t.fecha_inicio DESC" : "t.estado='abierto' DESC, t.fecha_inicio ASC").", t.torneo_id DESC
   LIMIT ? OFFSET ?
 ";
-
 $st = $conn->prepare($sql);
-if ($clubId > 0) {
-    $st->bind_param("iii", $clubId, $pageSize, $offset);
-} else {
-    $st->bind_param("ii", $pageSize, $offset);
-}
+$st->bind_param("ii", $pageSize, $offset);
 $st->execute();
 $rows = $st->get_result()->fetch_all(MYSQLI_ASSOC);
 $st->close();
 
-/* Mis inscripciones (para pintar acción) — SOLO si NO estamos en historial */
+/* Mis inscripciones (solo activos) */
 $joined = [];
 if (!$mostrarHistorial && !empty($rows)) {
     $ids = array_map('intval', array_column($rows, 'torneo_id'));
-    $inList = implode(',', $ids);
-    if ($inList !== '') {
+    if ($ids) {
+        $inList = implode(',', $ids);
         $sqlJ = "SELECT torneo_id FROM participaciones WHERE jugador_id=? AND torneo_id IN ($inList)";
         $stJ  = $conn->prepare($sqlJ);
         $stJ->bind_param('i', $userId);
@@ -113,290 +74,178 @@ if (!$mostrarHistorial && !empty($rows)) {
     }
 }
 
-/* mensajes -> alert() */
+/* mensajes */
 $okMsg  = isset($_GET['ok'])  ? trim($_GET['ok'])  : '';
 $errMsg = isset($_GET['err']) ? trim($_GET['err']) : '';
 ?>
 <style>
-.search-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-.search-form {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.search-bar select {
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid #e1ecec;
-    font-size: 14px;
-    min-width: 240px;
-    background: white;
-    cursor: pointer;
-}
-.search-bar button {
-    padding: 10px 14px;
-    border: none;
-    background: #07566b;
-    color: #fff;
-    border-radius: 10px;
-    cursor: pointer;
-    font-weight: 700;
-}
-.search-bar a.reset {
-    padding: 9px 12px;
-    border: 1px solid #1bab9d;
-    color: #1bab9d;
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 700;
-}
-/* BOTÓN HISTORIAL */
-.btn-historial {
-    padding: 10px 14px;
-    border: 1px solid #6c757d;
-    background: #fff;
-    color: #6c757d;
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 700;
-}
-.btn-historial:hover {
-    background: rgba(108, 117, 125, 0.08);
-    border-color: #5a6268;
-}
-.btn-historial.activo {
-    background: #6c757d;
-    color: #fff;
-    border-color: #6c757d;
-}
-.btn-historial.activo:hover {
-    background: #5a6268;
-    border-color: #5a6268;
-}
+/* ====== Estilo consistente con "Reservas" ====== */
+.page-wrap{ padding:24px 16px 40px; }
+.card-white{ max-width:1280px; margin:0 auto 24px auto; }
+.table-wrap{ width:100%; overflow-x:auto; }
 
-/* TABLA CENTRADA */
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-table th {
-    text-align: center;
-    padding: 12px 8px;
-    font-weight: 700;
-    color: #2a4e51;
-    border-bottom: 2px solid #e1ecec;
-}
-table td {
-    text-align: center;
-    padding: 12px 8px;
-    border-bottom: 1px solid #f0f5f5;
-}
-table tbody tr:hover { background: #f7fafb; }
+/* Toolbar (mismo patrón: título izq + botón a la derecha) */
+.toolbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+.toolbar-left{ display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+.push-right{ margin-left:auto; }
+.card-white .section-title{ font-size:26px; font-weight:700; color:var(--text-dark); margin:0; }
 
-/* Acciones alineadas al centro */
-.actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-}
-.btn-sm {
-    padding: 8px 12px;
-    border: 1px solid #1bab9d;
-    color: #1bab9d;
-    background: #fff;
-    border-radius: 10px;
-    text-decoration: none;
-    cursor: pointer;
-}
-.btn-sm:hover { background: rgba(27,171,157,.08); }
+    .btn-add {
+      display:inline-flex; align-items:center; gap:8px; padding:8px 12px;
+      text-decoration:none; font-weight:600; font-size:14px; transition:filter .15s ease, transform .03s ease; white-space:nowrap;
+    }
+    .btn-add:hover { background:#139488; }
 
-/* Paginación */
-.pagination {
-    display: flex;
-    gap: 8px;
-    margin-top: 14px;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: center;
+/* Tabla: texto alineado a la IZQUIERDA como en Reservas */
+.table-fixed{ table-layout:auto; width:100%; border-collapse:separate; border-spacing:0; }
+.table-fixed th,.table-fixed td{
+  text-align:left; padding:12px 14px; vertical-align:middle;
+  white-space:normal; overflow:visible; text-overflow:unset;
 }
-.pagination a,
-.pagination span {
-    padding: 8px 12px;
-    border: 1px solid #e1ecec;
-    border-radius: 999px;
-    text-decoration: none;
-    font-size: 14px;
-    line-height: 1;
-    color: #2a4e51;
-    background: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+table thead th{ color:#2a4e51; border-bottom:2px solid #e1ecec; font-weight:700; }
+table tbody td{ border-bottom:1px solid #f0f5f5; }
+table tbody tr:hover{ background:#f7fafb; }
+.row-link{ cursor:pointer; }
+.row-link:focus{ outline:2px solid #1bab9d; outline-offset:2px; }
+
+/* Acciones */
+.actions{ display:flex; gap:8px; align-items:center; }
+.btn-sm{
+  padding:8px 12px; border:1px solid #1bab9d; color:#1bab9d; background:#fff;
+  border-radius:10px; text-decoration:none; cursor:pointer; font-weight:700;
 }
-.pagination .active {
-    background: #1bab9d;
-    color: #fff;
-    border-color: transparent;
+.btn-sm:hover{ background:rgba(27,171,157,.08); }
+.btn-sm[disabled]{ opacity:.45; cursor:not-allowed; }
+
+/* Paginación (igual que Reservas) */
+.pagination{ display:flex; gap:8px; margin-top:14px; align-items:center; flex-wrap:wrap; justify-content:center; }
+.pagination a,.pagination span{
+  padding:8px 12px; border:1px solid #e1ecec; border-radius:999px; text-decoration:none;
+  font-size:14px; line-height:1; color:#2a4e51; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.06);
 }
-.pagination .disabled { color: #9ab3b5; background: #f3f7f7; }
-.row-link { cursor: pointer; }
-.row-link:focus { outline: 2px solid #1bab9d; outline-offset: 2px; }
+.pagination .active{ background:#1bab9d; color:#fff; border-color:transparent; }
+.pagination .disabled{ color:#9ab3b5; background:#f3f7f7; }
+
+/* Anchos mínimos para que “respire” como en Reservas */
+.col-nombre{ min-width:220px; }
+.col-club{ min-width:200px; }
+.col-inicio,.col-fin{ min-width:110px; }
+.col-tipo{ min-width:120px; }
+.col-cap{ min-width:110px; }
+.col-acciones{ min-width:160px; }
 </style>
 
 <div class="page-wrap">
   <h1 class="page-title">Torneos</h1>
 
   <div class="card-white">
-    <div class="search-bar">
-      <!-- Formulario de filtro por club -->
-      <form class="search-form" method="get">
-        <!-- Dropdown de clubes -->
-        <select name="club_id" onchange="this.form.submit()">
-          <option value="0">Todos los clubes</option>
-          <?php foreach ($clubes as $club): ?>
-            <option value="<?= (int)$club['user_id'] ?>" 
-                <?= ($clubId === (int)$club['user_id']) ? 'selected' : '' ?>>
-                <?= htmlspecialchars($club['nombre']) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-        
-        <?php if ($clubId > 0): ?>
-          <a class="reset" href="?<?= $mostrarHistorial ? 'historial=1' : '' ?>">Limpiar filtro</a>
-        <?php endif; ?>
-      </form>
-      
-      <!-- Botón de historial -->
-      <?php
-        $activo = $mostrarHistorial;
-        $hrefParams = [];
-        if ($clubId > 0) $hrefParams['club_id'] = $clubId;
-        $hrefParams['historial'] = $activo ? '' : '1';
-        $href = '?' . http_build_query(array_filter($hrefParams));
-      ?>
-      <a href="<?= htmlspecialchars($href) ?>" class="btn-historial <?= $activo ? 'activo' : '' ?>">
-        <?= $activo ? 'Ver torneos activos' : 'Historial de torneos' ?>
-      </a>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <h2 class="section-title"><?= $mostrarHistorial ? 'Historial de torneos' : 'Torneos activos' ?></h2>
+        <a class="btn-add push-right" href="<?= $mostrarHistorial ? '?' : '?historial=1' ?>">
+          <?= $mostrarHistorial ? 'Ver torneos activos' : 'Ver historial de torneos' ?>
+        </a>
+      </div>
     </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Club</th>
-          <th>Inicio</th>
-          <th>Fin</th>
-          <th>Estado</th>
-          <?php if (!$mostrarHistorial): ?>
-            <th>Inscriptos</th>
-            <th>Acciones</th>
-          <?php endif; ?>
-        </tr>
-      </thead>
-      <tbody>
-        <?php if ($rows): foreach ($rows as $t): 
-            $isJoined = !empty($joined[(int)$t['torneo_id']]);
+    <div class="table-wrap">
+      <table class="table-fixed">
+        <thead>
+          <tr>
+            <th class="col-nombre">Nombre</th>
+            <th class="col-club">Club</th>
+            <th class="col-inicio">Fecha inicio</th>
+            <th class="col-fin">Fecha fin</th>
+            <th class="col-tipo">Tipo</th>
+            <th class="col-cap">Capacidad</th>
+            <?php if (!$mostrarHistorial): ?><th class="col-acciones">Acciones</th><?php endif; ?>
+          </tr>
+        </thead>
+        <tbody>
+        <?php if ($rows): foreach ($rows as $t):
             $href = "/php/cliente/torneos/detalle_torneo.php?torneo_id=".(int)$t['torneo_id'];
+            $capacidad = (int)$t['capacidad'];
+            $insc      = (int)($t['inscriptos'] ?? 0);
+            $rest      = max(0, $capacidad - $insc);
+            $comenzo   = (int)$t['comienza_en'] < 0;
+            $noAbierto = ($t['estado'] !== 'abierto');
+            $full      = ($capacidad > 0 && $rest <= 0);
+            $isJoined  = !$mostrarHistorial && !empty($joined[(int)$t['torneo_id']]);
+            $canJoin   = (!$mostrarHistorial) && !$isJoined && !$noAbierto && !$comenzo && !$full;
         ?>
           <tr class="row-link" tabindex="0" data-href="<?= htmlspecialchars($href) ?>">
-            <td><?= htmlspecialchars($t['nombre']) ?></td>
-            <td><?= htmlspecialchars($t['club']) ?></td>
-            <td><?= fmt_md($t['fecha_inicio']) ?></td>
-            <td><?= fmt_md($t['fecha_fin']) ?></td>
-            <td><?= comienza_label($t['comienza_en']) ?></td>
+            <td class="col-nombre"><?= htmlspecialchars($t['nombre']) ?></td>
+            <td class="col-club"><?= htmlspecialchars($t['club']) ?></td>
+            <td class="col-inicio"><?= fmt_md($t['fecha_inicio']) ?></td>
+            <td class="col-fin"><?= fmt_md($t['fecha_fin']) ?></td>
+            <td class="col-tipo"><?= tipo_label($t['tipo']) ?></td>
+            <td class="col-cap"><?= $capacidad > 0 ? (int)$capacidad : '—' ?></td>
+
             <?php if (!$mostrarHistorial): ?>
-              <td><?= (int)($t['inscriptos'] ?? 0) ?></td>
-              <td class="actions">
+              <td class="actions col-acciones" onclick="event.stopPropagation();">
                 <?php if ($isJoined): ?>
-                  <form method="post" action="/php/cliente/torneos/salirTorneo.php" style="display:inline" onsubmit="event.stopPropagation(); return confirm('¿Salir del torneo?');">
+                  <form method="post" action="/php/cliente/torneos/salirTorneo.php" onsubmit="return confirm('¿Salir del torneo?');">
                     <input type="hidden" name="torneo_id" value="<?= (int)$t['torneo_id'] ?>">
                     <button type="submit" class="btn-sm">Salir</button>
                   </form>
-                <?php elseif ($t['estado']==='abierto'): ?>
-                  <form method="post" action="/php/cliente/torneos/unirseTorneo.php" style="display:inline" onsubmit="event.stopPropagation();">
+                <?php elseif ($canJoin): ?>
+                  <form method="post" action="/php/cliente/torneos/unirseTorneo.php">
                     <input type="hidden" name="torneo_id" value="<?= (int)$t['torneo_id'] ?>">
                     <input type="hidden" name="return" value="/php/cliente/torneos/torneos.php">
                     <button type="submit" class="btn-sm">Unirme</button>
                   </form>
+                <?php else: ?>
+                  <button class="btn-sm" disabled>
+                    <?php
+                      if ($noAbierto) echo 'Cerrado';
+                      elseif ($comenzo) echo 'Iniciado';
+                      elseif ($full) echo 'Sin cupo';
+                      else echo '—';
+                    ?>
+                  </button>
                 <?php endif; ?>
               </td>
             <?php endif; ?>
           </tr>
         <?php endforeach; else: ?>
           <tr>
-            <td colspan="<?= $mostrarHistorial ? '5' : '7' ?>" style="text-align:center;">
-              <?php
-                if ($mostrarHistorial) {
-                    echo $clubId > 0 ? 'No hay torneos terminados para este club' : 'No hay torneos en el historial';
-                } else {
-                    echo $clubId > 0 ? 'No hay torneos activos para este club' : 'No hay torneos activos disponibles';
-                }
-              ?>
+            <td colspan="<?= $mostrarHistorial ? '6' : '7' ?>" style="text-align:center;">
+              <?= $mostrarHistorial ? 'No hay torneos en el historial' : 'No hay torneos activos disponibles' ?>
             </td>
           </tr>
         <?php endif; ?>
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+    </div>
 
     <?php if ($totalPages > 1): ?>
       <div class="pagination">
         <?php 
           $prev = max(1, $page - 1);
           $next = min($totalPages, $page + 1);
-          
-          // Construir parámetros para enlaces de paginación
-          $pagParams = [];
-          if ($clubId > 0) $pagParams['club_id'] = $clubId;
-          if ($mostrarHistorial) $pagParams['historial'] = '1';
+          $base = $mostrarHistorial ? '?historial=1&' : '?';
         ?>
-        
-        <?php if ($page > 1): ?>
-          <?php $pagParams['page'] = $prev; ?>
-          <a href="?<?= http_build_query($pagParams) ?>">« Anterior</a>
-          <?php unset($pagParams['page']); ?>
-        <?php else: ?>
-          <span class="disabled">« Anterior</span>
-        <?php endif; ?>
-        
+        <?= $page>1 ? '<a href="'.$base.'page='.$prev.'">« Anterior</a>' : '<span class="disabled">« Anterior</span>' ?>
         <?php for($p = 1; $p <= $totalPages; $p++): ?>
-          <?php $pagParams['page'] = $p; ?>
-          <?php if ($p === $page): ?>
-            <span class="active"><?= $p ?></span>
-          <?php else: ?>
-            <a href="?<?= http_build_query($pagParams) ?>"><?= $p ?></a>
-          <?php endif; ?>
-          <?php unset($pagParams['page']); ?>
+          <?= $p===$page ? '<span class="active">'.$p.'</span>' : '<a href="'.$base.'page='.$p.'">'.$p.'</a>' ?>
         <?php endfor; ?>
-        
-        <?php if ($page < $totalPages): ?>
-          <?php $pagParams['page'] = $next; ?>
-          <a href="?<?= http_build_query($pagParams) ?>">Siguiente »</a>
-        <?php else: ?>
-          <span class="disabled">Siguiente »</span>
-        <?php endif; ?>
+        <?= $page<$totalPages ? '<a href="'.$base.'page='.$next.'">Siguiente »</a>' : '<span class="disabled">Siguiente »</span>' ?>
       </div>
     <?php endif; ?>
   </div>
 </div>
 
 <script>
-// Fila clickeable + teclado
+// Fila clickeable (ignora botones/form)
 document.querySelectorAll('.row-link').forEach(function(row){
   row.addEventListener('click', function(e){
-    if (e.target.closest('form') || e.target.closest('a')) return; // no navegar si click interno
+    if (e.target.closest('form') || e.target.closest('a') || e.target.closest('button')) return;
     window.location.href = this.dataset.href;
   });
-  row.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ window.location.href = this.dataset.href; }});
+  row.addEventListener('keydown', function(e){ if(e.key==='Enter'){ window.location.href = this.dataset.href; }});
 });
 
-// Mostrar alert() si viene ?ok o ?err y limpiar URL
+// alert() por ok/err y limpiar query (opcional)
 <?php
 $cleaner = "history.replaceState({}, '', window.location.pathname + window.location.search.replace(/(\\?|&)PLACE=[^&]*/, '').replace(/\\?&/,'?').replace(/\\?$/,''));";
 if ($okMsg): ?> alert(<?= json_encode($okMsg) ?>); <?= str_replace('PLACE','ok',$cleaner) ?> <?php endif; ?>

@@ -75,10 +75,12 @@ $avatarInitial = strtoupper(mb_substr($userName, 0, 1, 'UTF-8'));
         <div class="header-right">
             <nav>
                 <a href="/php/cliente/home_cliente.php">Inicio</a>
-                <a href="/php/cliente/historial_estadisticas/historial_estadisticas.php">reservas y estadísticas</a>
-                <a href="/php/cliente/ranking/ranking.php">Ranking</a>
-                <a href="/php/cliente/torneos/torneos.php">Torneos</a>
-                <a href="/php/cliente/reportes/reportes.php">Reportes</a>
+                <a href="/php/cliente/historial_estadisticas/historial_estadisticas.php">Gestionar reservas</a>
+                <a href="/php/cliente/torneos/torneos.php">Unirse a torneos</a>
+                <a href="/php/cliente/reportes/reportes.php">Crear un reporte</a>
+                <a href="/php/cliente/notificaciones/notificaciones.php">Ver notificaciones</a>
+                <a href="/php/cliente/ranking/ranking.php">Ver ranking</a>
+
                 <!-- Quitamos "Cerrar sesión" directo del header -->
             </nav>
 

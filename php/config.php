@@ -3,7 +3,7 @@ $host = 'localhost';
 $dbname = 'goatsport_db';
 $username = 'root';
 $password = '';
-$puerto = '3306';
+$puerto = '3307';
 
 $conn = new mysqli($host, $username, $password, $dbname, $puerto);
 
