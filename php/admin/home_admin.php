@@ -53,15 +53,6 @@ include 'includes/sidebar.php';
             </div>
         </a>
 
-        <a href="./ranking/ranking.php" style="text-decoration:none;">
-            <div
-                style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; transition:0.2s ease; cursor:pointer;">
-                <div style="font-size:40px; margin-bottom:10px;">🏆</div>
-                <h3 style="color:#043b3d;">Ranking</h3>
-                <p style="color:#666; font-size:14px;">Ver ranking de jugadores</p>
-            </div>
-        </a>
-
         <a href="./pagos/pagos.php" style="text-decoration:none;">
             <div
                 style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; transition:0.2s ease; cursor:pointer;">
