@@ -56,7 +56,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $mail->Port = 587;
 
             $mail->setFrom('goatsportsoporte2025@gmail.com', 'Goat Sport Soporte');
-            $mail->addAddress($email);
+            $mail->addAddress(address: $email);
 
             $mail->isHTML(true);
             $mail->Subject = 'Recuperación de contraseña';

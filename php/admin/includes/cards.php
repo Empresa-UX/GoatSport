@@ -1,35 +1,54 @@
 <?php
+// File: admin/partials/cards.php
 include './../../config.php';
 
-$sqlIngresos = "SELECT SUM(monto) AS total_ingresos FROM pagos WHERE estado = 'pagado'";
-$result = $conn->query($sqlIngresos);
-$totalIngresos = ($result && $row = $result->fetch_assoc()) ? $row['total_ingresos'] : 0;
+/**
+ * Ejecuta un COUNT(*) y retorna entero; 0 si falla.
+ * Motivo: evitar romper la UI por errores/NULLs.
+ */
+function fetch_int(mysqli $conn, string $sql): int {
+    $res = $conn->query($sql);
+    if (!$res) { return 0; }
+    $row = $res->fetch_row();
+    return isset($row[0]) ? (int)$row[0] : 0;
+}
 
-// 2. Total reservas
-$sqlTotalReservas = "SELECT COUNT(*) AS total_reservas FROM reservas";
-$result = $conn->query($sqlTotalReservas);
-$totalReservas = ($result && $row = $result->fetch_assoc()) ? $row['total_reservas'] : 0;
+// 1) Proveedores totales
+$totalProveedores = fetch_int($conn, "
+    SELECT COUNT(*) FROM usuarios WHERE rol = 'proveedor'
+");
 
-// 3. Reservas esta semana
-$hoy = date('Y-m-d');
-$semanaFin = date('Y-m-d', strtotime('+7 days'));
-$sqlReservasSemana = "
-    SELECT COUNT(*) AS reservas_semana 
-    FROM reservas 
-    WHERE fecha BETWEEN '$hoy' AND '$semanaFin'
-";
-$result = $conn->query($sqlReservasSemana);
-$reservasSemana = ($result && $row = $result->fetch_assoc()) ? $row['reservas_semana'] : 0;
+// 2) Canchas totales (todas las de todos los proveedores)
+$totalCanchas = fetch_int($conn, "
+    SELECT COUNT(*) FROM canchas
+");
 
-// 4. Cantidad de canchas
-$sqlCanchas = "SELECT COUNT(*) AS total_canchas FROM canchas";
-$result = $conn->query($sqlCanchas);
-$totalCanchas = ($result && $row = $result->fetch_assoc()) ? $row['total_canchas'] : 0;
+// 3) Reservas totales (excluye canceladas)
+$totalReservasActivas = fetch_int($conn, "
+    SELECT COUNT(*) FROM reservas WHERE estado <> 'cancelada'
+");
+
+// 4) Torneos totales (sin contar los que ya pasaron)
+$totalTorneosVigentes = fetch_int($conn, "
+    SELECT COUNT(*) FROM torneos WHERE fecha_fin >= CURDATE()
+");
 ?>
 
 <div class="cards">
-    <div class="card"><h3>Total Ingresos</h3><p>$<?= number_format($totalIngresos, 2) ?></p></div>
-    <div class="card"><h3>Total Reservas</h3><p><?= $totalReservas ?></p></div>
-    <div class="card"><h3>Reservas esta semana</h3><p><?= $reservasSemana ?></p></div>
-    <div class="card"><h3>Canchas</h3><p><?= $totalCanchas ?></p></div>
+    <div class="card">
+        <h3>Proveedores totales</h3>
+        <p><?= number_format($totalProveedores, 0, ',', '.') ?></p>
+    </div>
+    <div class="card">
+        <h3>Canchas activas</h3>
+        <p><?= number_format($totalCanchas, 0, ',', '.') ?></p>
+    </div>
+    <div class="card">
+        <h3>Reservas totales</h3>
+        <p><?= number_format($totalReservasActivas, 0, ',', '.') ?></p>
+    </div>
+    <div class="card">
+        <h3>Próximos torneos</h3>
+        <p><?= number_format($totalTorneosVigentes, 0, ',', '.') ?></p>
+    </div>
 </div>

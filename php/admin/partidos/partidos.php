@@ -7,15 +7,15 @@
  *
  * Amistosos:
  *   Columnas: ID, Fecha (dd/mm), Hora (HH:MM), Reserva, Jugador1, Jugador2,
- *             Resultado, Ganador, Acciones (Editar)
+ *             Resultado, Ganador
  *   Filtros: Buscar por jugadores, Mes, Día, Ganador (con/sin)
  *
  * Torneos:
  *   Columnas: ID, Nombre torneo, Fecha, Hora, Jugador1, Jugador2,
- *             Resultado, Ganador, Acciones (Editar)
+ *             Resultado, Ganador
  *   Filtros: Buscar por jugadores, Nombre torneo, Mes, Día, Ganador (con/sin)
  *
- * Admin: SOLO puede editar, NO eliminar.
+ * Admin: sin agregar ni editar.
  * ========================================================================= */
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
@@ -103,27 +103,18 @@ if ($view === 'amistosos') {
       <a class="tab <?= $view==='torneos'?'active':'' ?>" href="?view=torneos">De torneo</a>
       <a class="tab <?= $view==='amistosos'?'active':'' ?>" href="?view=amistosos">Amistosos</a>
     </div>
-    <button onclick="location.href='partidosForm.php'" class="btn-add">
-      <?= $view==='torneos' ? 'Agregar partido de torneo' : 'Agregar amistoso' ?>
-    </button>
+    <!-- Botón Agregar removido -->
+    <span></span>
   </div>
 
   <style>
-    :root{
-      --brand:#0f766e;
-    }
-
-    .btn-add {
-      display:inline-flex; align-items:center; gap:8px; padding:8px 12px;
-      text-decoration:none; font-weight:600; font-size:14px; transition:filter .15s ease, transform .03s ease; white-space:nowrap;
-    }
-    .btn-add:hover { background:#139488; }
+    :root{ --brand:#0f766e; }
 
     .tab{
       display:inline-block; padding:6px 10px; border-radius:999px; text-decoration:none;
       background:#fff; border:1px solid #d6dadd; color:#334155; font-weight:600; font-size:13px;
     }
-    .tab.active{   background: #1bab9d; color:#fff; border-color:#1bab9d; }
+    .tab.active{ background:#1bab9d; color:#fff; border-color:#1bab9d; }
 
     /* Filtros */
     .fbar{
@@ -201,75 +192,35 @@ if ($view === 'amistosos') {
       overflow:hidden;
       text-overflow:ellipsis;
     }
-    .sub{
-      font-size:12px;
-      color:#64748b;
-    }
+    .sub{ font-size:12px; color:#64748b; }
 
-    /* === Anchos columnas (MODIFICALOS ACA) === */
-
+    /* === Anchos columnas (sin Acciones) === */
     /* TORNEOS */
-    .col-id       { width:50px; }
-    .col-torneo   { width:190px; } /* Nombre torneo */
-    .col-fecha    { width:80px; }  /* Fecha (dd/mm) */
-    .col-hora     { width:80px; }  /* Hora */
-    .col-jug      { width:170px; } /* Jugador 1/2 */
-    .col-res      { width:140px; } /* Resultado */
-    .col-ganador  { width:150px; }
-    .col-acc      { width:90px; }
+    .col-id      { width:50px; }
+    .col-torneo  { width:190px; }
+    .col-fecha   { width:80px; }
+    .col-hora    { width:80px; }
+    .col-jug     { width:170px; }
+    .col-res     { width:140px; }
+    .col-ganador { width:150px; }
 
     /* AMISTOSOS */
-    .col-aid      { width:60px; }  /* ID partido */
-    .col-afecha   { width:80px; }  /* Fecha (dd/mm) */
-    .col-ahora    { width:80px; }  /* Hora (HH:MM) */
-    .col-areserva { width:90px; }  /* Reserva */
-    .col-ajug     { width:170px; } /* Jugadores */
-    .col-ares     { width:140px; } /* Resultado */
-    .col-agan     { width:150px; } /* Ganador */
-    .col-aacc     { width:90px; }  /* Acciones */
+    .col-aid      { width:60px; }
+    .col-afecha   { width:80px; }
+    .col-ahora    { width:80px; }
+    .col-areserva { width:90px; }
+    .col-ajug     { width:170px; }
+    .col-ares     { width:140px; }
+    .col-agan     { width:150px; }
 
-    /* Pills / chips para darle color */
     .pill{
-      display:inline-flex;
-      align-items:center;
-      padding:3px 8px;
-      border-radius:999px;
-      font-size:12px;
-      font-weight:600;
-      border:1px solid transparent;
-      white-space:nowrap;
+      display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px;
+      font-size:12px; font-weight:600; border:1px solid transparent; white-space:nowrap;
     }
-    .pill-torneo{
-      background:#e0f2fe;
-      border-color:#bfdbfe;
-      color:#1d4ed8;
-    }
-    .pill-win{
-      background:#ecfdf3;
-      border-color:#bbf7d0;
-      color:#166534;
-    }
-    .pill-reserva{
-      background:#fef3c7;
-      border-color:#fed7aa;
-      color:#92400e;
-    }
+    .pill-torneo{ background:#e0f2fe; border-color:#bfdbfe; color:#1d4ed8; }
+    .pill-win{ background:#ecfdf3; border-color:#bbf7d0; color:#166534; }
+    .pill-reserva{ background:#fef3c7; border-color:#fed7aa; color:#92400e; }
 
-    /* Botón editar */
-    .actions .btn-action{
-      appearance:none;
-      border:none;
-      border-radius:8px;
-      padding:6px 10px;
-      cursor:pointer;
-      font-weight:700;
-      background:#e0ecff;
-      border:1px solid #bfd7ff;
-      color:#1e40af;
-    }
-    .actions .btn-action:hover{ filter:brightness(.97); }
-
-    /* Filas con ganador -> leve acento */
     .row-win{ background:#f5fdf7; }
   </style>
 
@@ -357,7 +308,6 @@ if ($view === 'amistosos') {
           <th class="col-jug">Jugador 2</th>
           <th class="col-res">Resultado</th>
           <th class="col-ganador">Ganador</th>
-          <th class="col-acc">Acciones</th>
         </tr>
       <?php else: ?>
         <tr>
@@ -369,14 +319,13 @@ if ($view === 'amistosos') {
           <th class="col-ajug">Jugador 2</th>
           <th class="col-ares">Resultado</th>
           <th class="col-agan">Ganador</th>
-          <th class="col-aacc">Acciones</th>
         </tr>
       <?php endif; ?>
     </thead>
     <tbody>
       <?php if ($view === 'torneos'): ?>
         <?php if (empty($partidosTorneo)): ?>
-          <tr><td colspan="9" style="text-align:center;">No hay partidos de torneo</td></tr>
+          <tr><td colspan="8" style="text-align:center;">No hay partidos de torneo</td></tr>
         <?php else: foreach ($partidosTorneo as $row):
           $t   = strtotime($row['fecha']);
           $dia = $t ? (int)date('j',$t) : '';
@@ -427,17 +376,11 @@ if ($view === 'amistosos') {
                 <span class="sub">—</span>
               <?php endif; ?>
             </td>
-            <td class="col-acc actions">
-              <button class="btn-action"
-                onclick="location.href='partidosForm.php?partido_id=<?= (int)$row['partido_id'] ?>'">
-                Editar
-              </button>
-            </td>
           </tr>
         <?php endforeach; endif; ?>
       <?php else: ?>
         <?php if (empty($partidosAmistosos)): ?>
-          <tr><td colspan="9" style="text-align:center;">No hay partidos amistosos</td></tr>
+          <tr><td colspan="8" style="text-align:center;">No hay partidos amistosos</td></tr>
         <?php else: foreach ($partidosAmistosos as $row):
           $t      = strtotime($row['fecha']);
           $fecha  = ddmm($row['fecha']);
@@ -489,12 +432,6 @@ if ($view === 'amistosos') {
               <?php else: ?>
                 <span class="sub">—</span>
               <?php endif; ?>
-            </td>
-            <td class="col-aacc actions">
-              <button class="btn-action"
-                onclick="location.href='partidosForm.php?partido_id=<?= (int)$row['partido_id'] ?>'">
-                Editar
-              </button>
             </td>
           </tr>
         <?php endforeach; endif; ?>

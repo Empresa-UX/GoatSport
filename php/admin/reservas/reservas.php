@@ -2,11 +2,9 @@
 /* =========================================================================
  * file: admin/reservas/reservas.php
  * Listado de reservas para ADMIN
- * - Inspirado en recepcionista/reservas/reservas.php (mismos chips/colores)
- * - Filtros: fecha exacta, cancha, estado de pago, estado reserva, tipo,
- *            fecha (día/mes)
+ * - Filtros: fecha exacta, cancha, proveedor, estado de pago, estado reserva, tipo
  * - Columnas: ID, Fecha (dd/mm), Cancha, Creador, Hora, Tipo, Estado reserva,
- *             Método pago, Estado pago, Precio total, Acciones (solo Editar)
+ *             Método pago, Estado pago, Precio total
  * ========================================================================= */
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
@@ -23,19 +21,27 @@ function ddmm(?string $d): string {
 /* ==== Filtros ==== */
 $fecha          = $_GET['fecha']          ?? date('Y-m-d');
 $cancha_filter  = isset($_GET['cancha_id']) ? (int)$_GET['cancha_id'] : 0;
+$proveedor_id   = isset($_GET['proveedor_id']) ? (int)$_GET['proveedor_id'] : 0;
 $estado_pago    = $_GET['estado_pago']    ?? 'todos';
 $estado_reserva = $_GET['estado_reserva'] ?? '';
 $tipo_reserva_f = $_GET['tipo_reserva']   ?? '';
-$dia_filtro     = $_GET['dia']            ?? '';
-$mes_filtro     = $_GET['mes']            ?? '';
 $focus_id       = isset($_GET['focus']) ? (int)$_GET['focus'] : 0;
 
 /* === Canchas (todas las activas) === */
 $canchas = [];
 $cq = $conn->query("SELECT cancha_id, nombre FROM canchas WHERE activa = 1 ORDER BY nombre ASC");
-if ($cq) {
-  while ($r = $cq->fetch_assoc()) $canchas[] = $r;
-}
+if ($cq) { while ($r = $cq->fetch_assoc()) $canchas[] = $r; }
+
+/* === Proveedores (para filtro) === */
+$proveedores = [];
+$pq = $conn->query("
+  SELECT u.user_id, COALESCE(pd.nombre_club, u.nombre) AS label
+  FROM usuarios u
+  LEFT JOIN proveedores_detalle pd ON pd.proveedor_id = u.user_id
+  WHERE u.rol = 'proveedor'
+  ORDER BY label ASC
+");
+if ($pq) { while ($r = $pq->fetch_assoc()) $proveedores[] = $r; }
 
 /* ==== Reservas + último pago ==== */
 $sql = "
@@ -44,6 +50,7 @@ SELECT
   r.precio_total, r.tipo_reserva,
   c.nombre AS cancha_nombre,
   u.nombre AS creador_nombre,
+  c.proveedor_id,
   lp.pago_id, lp.metodo, lp.estado AS estado_pago
 FROM reservas r
 JOIN canchas c ON c.cancha_id = r.cancha_id
@@ -72,7 +79,14 @@ if ($cancha_filter > 0) {
   $types   .= "i";
 }
 
-/* Filtros de estado de pago (incluye presencial) */
+/* Filtro por proveedor */
+if ($proveedor_id > 0) {
+  $sql    .= " AND c.proveedor_id = ? ";
+  $params[] = $proveedor_id;
+  $types   .= "i";
+}
+
+/* Filtros de estado de pago */
 if ($estado_pago === 'pagado') {
   $sql .= " AND lp.estado = 'pagado' ";
 } elseif ($estado_pago === 'pendiente_tarjeta') {
@@ -97,18 +111,6 @@ if (in_array($estado_reserva, ['pendiente','confirmada','cancelada','no_show'], 
   $types   .= "s";
 }
 
-/* Filtro por día/mes (sobre r.fecha) */
-if ($dia_filtro !== '') {
-  $sql    .= " AND DAY(r.fecha) = ? ";
-  $params[] = (int)$dia_filtro;
-  $types   .= "i";
-}
-if ($mes_filtro !== '') {
-  $sql    .= " AND MONTH(r.fecha) = ? ";
-  $params[] = (int)$mes_filtro;
-  $types   .= "i";
-}
-
 $sql .= " ORDER BY r.hora_inicio ASC";
 
 $stmt = $conn->prepare($sql);
@@ -117,7 +119,7 @@ $stmt->execute();
 $reservas = $stmt->get_result();
 $stmt->close();
 
-/* ==== Helpers UI (mismos que recepcionista) ==== */
+/* ==== Helpers UI ==== */
 function labelPago(?string $estadoPago, ?string $metodo, ?int $pagoId): string {
   if(!$pagoId) return 'Sin pago';
   if($estadoPago === 'pagado') return 'Pagado';
@@ -175,154 +177,49 @@ function capFirst(?string $s): string {
 <div class="section">
   <div class="section-header">
     <h2>Reservas</h2>
-    <!-- Si algún día querés permitir agregar desde admin, acá va el botón -->
-    <!-- <button onclick="location.href='reservasForm.php'" class="btn-add">Agregar reserva</button> -->
   </div>
 
   <style>
-    .filterbar{
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      align-items:flex-end;
-      margin:14px 0 16px;
-    }
-    .f-field{
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-      min-width:160px;
-      flex:1 1 160px;
-    }
-    .f-field.tiny{
-      min-width:110px;
-      max-width:120px;
-      flex:0 0 120px;
-    }
-    .f-label{
-      font-size:12px;
-      color:#586168;
-      font-weight:600;
-      letter-spacing:.3px;
-    }
-    .f-input,.f-select,.f-date,.f-time{
-      width:100%;
-      padding:8px 10px;
-      border:1px solid #d6dadd;
-      border-radius:10px;
-      background:#fff;
-      outline:none;
-      transition:border-color .2s,box-shadow .2s;
-      box-shadow:0 1px 0 rgba(0,0,0,.03);
-    }
-    .f-input:focus,.f-select:focus,.f-date:focus,.f-time:focus{
-      border-color:#1bab9d;
-      box-shadow:0 0 0 3px rgba(27,171,157,.12);
-    }
-    .f-actions{
-      margin-left:auto;
-      display:flex;
-      gap:10px;
-    }
-    .f-actions .btn-add{
-      display:none; /* auto-submit al cambiar filtros */
-    }
+    .filterbar{ display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin:14px 0 16px; }
+    .f-field{ display:flex; flex-direction:column; gap:6px; min-width:160px; flex:1 1 160px; }
+    .f-label{ font-size:12px; color:#586168; font-weight:600; letter-spacing:.3px; }
+    .f-input,.f-select,.f-date{ width:100%; padding:8px 10px; border:1px solid #d6dadd; border-radius:10px; background:#fff; outline:none; transition:border-color .2s,box-shadow .2s; box-shadow:0 1px 0 rgba(0,0,0,.03); }
+    .f-input:focus,.f-select:focus,.f-date:focus{ border-color:#1bab9d; box-shadow:0 0 0 3px rgba(27,171,157,.12); }
+    .f-actions{ margin-left:auto; display:flex; gap:10px; }
+    .f-actions .btn-add{ display:none; }
 
-    /* Chips igual que recepcionista */
-    .chip{
-      padding:2px 10px;
-      border-radius:999px;
-      font-size:12px;
-      border:1px solid transparent;
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      min-width:108px;
-      justify-content:center;
-    }
-    span.chip.chip-pay-warn {
-    text-align: center;
-    }
+    /* Chips */
+    .chip{ padding:2px 10px; border-radius:999px; font-size:12px; border:1px solid transparent; display:inline-flex; align-items:center; gap:6px; min-width:108px; justify-content:center; }
     .chip-pay-ok{background:#e6f7f4;color:#0b6158;border-color:#b7e6de}
-    .chip-pay-warn{background:#fff8e1;color:#9a6700;border-color:#ffe082}
+    .chip-pay-warn{background:#fff8e1;color:#9a6700;border-color:#ffe082; text-align: center;}
     .chip-ok{background:#e8f5e9;color:#2e7d32;border-color:#c8e6c9}
     .chip-info{background:#e3f2fd;color:#1a5fb4;border-color:#bbdefb}
     .chip-bad{background:#ffebee;color:#c62828;border-color:#ffcdd2}
     .chip-neutral{background:#eef2f7;color:#415a77;border-color:#d8e0ea}
-    .chip-method-club{background:#e6f7f4;color:#0b6158;border-color:#b7e6de}
-    .chip-method-mp{background:#e3f2fd;color:#1a5fb4;border-color:#bbdefb}
-    .chip-method-card{background:#ede7f6;color:#5e35b1;border-color:#d1c4e9}
-    table{
-      width:100%;
-      border-collapse:separate;
-      border-spacing:0;
-      background:#fff;
-      border-radius:12px;
-      overflow:hidden;
-      table-layout:fixed;
-    }
-    thead th{
-      position:sticky;
-      top:0;
-      background:#f8fafc;
-      z-index:1;
-      text-align:left;
-      font-weight:700;
-      padding:10px 12px;
-      font-size:13px;
-      color:#334155;
-      border-bottom:1px solid #e5e7eb;
-    }
-    tbody td{
-      padding:10px 12px;
-      border-bottom:1px solid #f1f5f9;
-      vertical-align:top;
-    }
+
+    table{ width:100%; border-collapse:separate; border-spacing:0; background:#fff; border-radius:12px; overflow:hidden; table-layout:fixed; }
+    thead th{ position:sticky; top:0; background:#f8fafc; z-index:1; text-align:left; font-weight:700; padding:10px 12px; font-size:13px; color:#334155; border-bottom:1px solid #e5e7eb; }
+    tbody td{ padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
     tbody tr:hover{background:#f7fbfd}
-    .truncate{
-      display:block;
-      max-width:100%;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
+    .truncate{ display:block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .td-center{text-align:center}
     .money{white-space:nowrap}
 
-    /* === Anchos columnas (modificalos acá a gusto) === */
+    /* Anchos */
     .col-id      { width:30px; }
     .col-fecha   { width:60px; }
     .col-cancha  { width:170px; }
     .col-creador { width:170px; }
     .col-hora    { width:110px; }
     .col-tipo    { width:70px; }
-    .col-eres    { width:130px; } /* estado reserva */
-    .col-met     { width:120px; } /* método */
-    .col-epago   { width:120px; } /* estado pago */
+    .col-eres    { width:130px; }
+    .col-met     { width:120px; }
+    .col-epago   { width:120px; }
     .col-precio  { width:105px; }
-    .col-acc     { width:80px; }
 
     .row-new{background:#f7fbfd}
-
-    .actions .btn-action.edit{
-      appearance:none;
-      border:none;
-      border-radius:8px;
-      padding:6px 10px;
-      cursor:pointer;
-      font-weight:700;
-      background:#e0ecff;
-      border:1px solid #bfd7ff;
-      color:#1e40af;
-    }
-    .actions .btn-action.edit:hover{filter:brightness(.97)}
-
-    /* Highlight por focus */
     .row-highlight{ animation: hiBlink 1.2s ease-in-out 3; }
-    @keyframes hiBlink {
-      0%,100%{background-color:inherit}
-      50%{background-color:#fffbe6}
-    }
+    @keyframes hiBlink { 0%,100%{background-color:inherit} 50%{background-color:#fffbe6} }
   </style>
 
   <!-- Filtros -->
@@ -339,6 +236,18 @@ function capFirst(?string $s): string {
         <?php foreach ($canchas as $c): ?>
           <option value="<?= (int)$c['cancha_id'] ?>" <?= $cancha_filter===(int)$c['cancha_id']?'selected':'' ?>>
             <?= htmlspecialchars($c['nombre']) ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
+    <div class="f-field">
+      <label class="f-label">Proveedor</label>
+      <select class="f-select" name="proveedor_id">
+        <option value="0">Todos</option>
+        <?php foreach ($proveedores as $p): ?>
+          <option value="<?= (int)$p['user_id'] ?>" <?= $proveedor_id===(int)$p['user_id']?'selected':'' ?>>
+            <?= htmlspecialchars($p['label']) ?>
           </option>
         <?php endforeach; ?>
       </select>
@@ -375,27 +284,6 @@ function capFirst(?string $s): string {
       </select>
     </div>
 
-    <!-- Fecha por Día/Mes -->
-    <div class="f-field tiny">
-      <label class="f-label">Fecha (Día)</label>
-      <select class="f-select" name="dia">
-        <option value="">Todos</option>
-        <?php for($d=1;$d<=31;$d++): ?>
-          <option value="<?= $d ?>" <?= (string)$dia_filtro===(string)$d ? 'selected' : '' ?>><?= $d ?></option>
-        <?php endfor; ?>
-      </select>
-    </div>
-
-    <div class="f-field tiny">
-      <label class="f-label">Fecha (Mes)</label>
-      <select class="f-select" name="mes">
-        <option value="">Todos</option>
-        <?php for($m=1;$m<=12;$m++): ?>
-          <option value="<?= $m ?>" <?= (string)$mes_filtro===(string)$m ? 'selected' : '' ?>><?= $m ?></option>
-        <?php endfor; ?>
-      </select>
-    </div>
-
     <div class="f-actions">
       <button class="btn-add" type="submit">Aplicar filtros</button>
     </div>
@@ -414,7 +302,6 @@ function capFirst(?string $s): string {
       <th class="col-met">Método pago</th>
       <th class="col-epago">Estado pago</th>
       <th class="col-precio">Precio total</th>
-      <th class="col-acc">Acciones</th>
     </tr>
 
     <?php if ($reservas->num_rows): ?>
@@ -427,9 +314,7 @@ function capFirst(?string $s): string {
         $metLbl  = labelMetodo($r['metodo'] ?? null);
         $metCls  = classMetodo($r['metodo'] ?? null);
 
-        $rowClass = ($r['estado'] === 'pendiente' || (($r['estado_pago'] ?? null) === 'pendiente'))
-          ? 'row-new'
-          : '';
+        $rowClass = ($r['estado'] === 'pendiente' || (($r['estado_pago'] ?? null) === 'pendiente')) ? 'row-new' : '';
         $isFocus  = ($focus_id > 0 && (int)$r['reserva_id'] === $focus_id);
       ?>
         <tr id="reserva-<?= (int)$r['reserva_id'] ?>" class="<?= $rowClass ?> <?= $isFocus ? 'row-highlight' : '' ?>">
@@ -439,29 +324,14 @@ function capFirst(?string $s): string {
           <td class="col-creador"><?= htmlspecialchars($r['creador_nombre']) ?></td>
           <td class="col-hora"><?= htmlspecialchars($hora) ?></td>
           <td class="col-tipo"><?= htmlspecialchars(capFirst($r['tipo_reserva'])) ?></td>
-          <td class="col-eres">
-            <span class="chip <?= $resCls ?>"><?= $resLbl ?></span>
-          </td>
-          <td class="col-met td-center">
-            <span class="chip <?= $metCls ?>"><?= $metLbl ?></span>
-          </td>
-          <td class="col-epago">
-            <span class="chip <?= $pagoCls ?>"><?= $pagoLbl ?></span>
-          </td>
-          <td class="col-precio money">
-            $<?= number_format((float)$r['precio_total'], 2, ',', '.') ?>
-          </td>
-          <td class="col-acc actions">
-            <button
-              class="btn-action edit"
-              onclick="location.href='reservasForm.php?reserva_id=<?= (int)$r['reserva_id'] ?>'">
-              Editar
-            </button>
-          </td>
+          <td class="col-eres"><span class="chip <?= $resCls ?>"><?= $resLbl ?></span></td>
+          <td class="col-met td-center"><span class="chip <?= $metCls ?>"><?= $metLbl ?></span></td>
+          <td class="col-epago"><span class="chip <?= $pagoCls ?>"><?= $pagoLbl ?></span></td>
+          <td class="col-precio money">$<?= number_format((float)$r['precio_total'], 2, ',', '.') ?></td>
         </tr>
       <?php endwhile; ?>
     <?php else: ?>
-      <tr><td colspan="11" style="text-align:center;">Sin reservas para los filtros seleccionados.</td></tr>
+      <tr><td colspan="10" style="text-align:center;">Sin reservas para los filtros seleccionados.</td></tr>
     <?php endif; ?>
   </table>
 </div>
@@ -470,10 +340,7 @@ function capFirst(?string $s): string {
 (function(){
   const form = document.getElementById('filtersForm');
   if(!form) return;
-  const submit = () => {
-    if(form.requestSubmit) form.requestSubmit();
-    else form.submit();
-  };
+  const submit = () => { if(form.requestSubmit) form.requestSubmit(); else form.submit(); };
 
   form.querySelectorAll('select').forEach(el => el.addEventListener('change', submit));
   form.querySelectorAll('input[type="date"]').forEach(el => {
@@ -481,7 +348,6 @@ function capFirst(?string $s): string {
     el.addEventListener('input', () => { if(el.value) submit(); });
   });
 
-  // Focus + scroll suave si viene ?focus=<id>
   const sp = new URL(location.href).searchParams;
   const focus = parseInt(sp.get('focus')||'0',10);
   if (focus>0) {

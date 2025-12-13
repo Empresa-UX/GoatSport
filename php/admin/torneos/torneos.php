@@ -35,18 +35,13 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
 <div class="section">
   <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
     <h2 style="margin:0;">Torneos</h2>
-    <?php if ($rol!=='admin'): ?>
-      <button onclick="location.href='torneosForm.php'" class="btn-add">Crear torneo</button>
-    <?php endif; ?>
+    <!-- Botón de crear quitado (no usamos torneosForm.php) -->
+    <span></span>
   </div>
 
   <style>
     :root{ --brand:#0f766e; }
-    .btn-add{ display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:none;border-radius:10px;background:#1bab9d;color:#fff;font-weight:600 }
-    .btn-add:hover{ filter:brightness(1.05) }
-
     .fbar{ display:grid;gap:12px;align-items:end;background:#fff;padding:14px 16px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.08);margin:12px 0; }
-    /* nombre grande, proveedor medio, 6 selects IGUALES */
     .fbar.cols-8{ grid-template-columns: minmax(240px,1fr) minmax(200px,240px) repeat(6, minmax(100px,140px)); }
     @media (max-width:1100px){ .fbar{ grid-template-columns: repeat(2,minmax(220px,1fr)); } }
     @media (max-width:640px){ .fbar{ grid-template-columns: 1fr; } }
@@ -61,7 +56,7 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
     .truncate{ display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
 
     .col-id{width:42px}.col-nom{width:200px}.col-prov{width:180px}.col-fe{width:70px}
-    .col-es{width:90px}.col-ti{width:90px}.col-cap{width:90px}.col-pts{width:120px}.col-acc{width:190px}
+    .col-es{width:90px; text-align: center;}.col-ti{width:90px; text-align: center;}.col-cap{width:90px}.col-pts{width:120px}.col-acc{width:210px; text-align: center;}
 
     .pill{ display:inline-block;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid transparent;white-space:nowrap }
     .st-open{background:#e6f7f4;border-color:#c8efe8;color:#0f766e}
@@ -71,7 +66,6 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
     .tp-ind{background:#fde8f1;border-color:#f8c7da;color:#a11a5b}
 
     .btn-action{appearance:none;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:700}
-    .btn-action.edit{background:#e0ecff;border:1px solid #bfd7ff;color:#1e40af}
     .btn-action.part{background:#e6f7f4;border:1px solid #c8efe8;color:#0f766e}
     .btn-action.delete{background:#fde8e8;border:1px solid #f8c9c9;color:#7f1d1d}
     .actions{display:flex;gap:6px;flex-wrap:wrap}
@@ -133,14 +127,12 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
         <td class="col-pts"><?= (int)($r['puntos_ganador']??0)?></td>
         <td class="col-acc">
           <div class="actions">
-            <button class="btn-action edit" onclick="location.href='torneosForm.php?torneo_id=<?= (int)$r['torneo_id']?>'">Editar</button>
             <button class="btn-action part" onclick="location.href='torneoParticipantes.php?torneo_id=<?= (int)$r['torneo_id']?>'">Participantes</button>
-            <?php if($rol!=='admin'): ?>
             <form method="POST" action="torneosAction.php" onsubmit="return confirm('¿Eliminar torneo?');" style="display:inline-block">
-              <input type="hidden" name="action" value="delete"><input type="hidden" name="torneo_id" value="<?= (int)$r['torneo_id']?>">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="torneo_id" value="<?= (int)$r['torneo_id']?>">
               <button type="submit" class="btn-action delete">Eliminar</button>
             </form>
-            <?php endif; ?>
           </div>
         </td>
       </tr>
