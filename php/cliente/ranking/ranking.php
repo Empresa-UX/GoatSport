@@ -101,99 +101,139 @@ table tbody tr:hover{ background:#f7fafb; }
 
 .me-card{ margin-bottom:12px; }
 .me-card table td{ border:none; padding:6px 8px; }
+
+.ranking-layout{
+    display: grid;
+    grid-template-columns: 0.6fr 1.4fr;
+    gap: 40px;
+    align-items: start;
+}
+
+@media (max-width: 900px){
+    .ranking-layout{
+        grid-template-columns: 1fr;
+    }
+}
+.stats-title{
+    color: #000;
+}
+
 </style>
 
 <div class="page-wrap">
     <h1 class="page-title">Ranking</h1>
 
-    <?php if ($me): ?>
-    <div class="card-white me-card">
-        <table>
-            <tbody>
-                <tr>
-                    <td><strong>Tu nombre</strong></td>
-                    <td><?= htmlspecialchars($me['nombre']) ?> <span class="badge-me">tú</span></td>
-                    <td><strong>Puntos</strong></td>
-                    <td><?= (int)$me['puntos'] ?></td>
-                    <td><strong>Partidos</strong></td>
-                    <td><?= (int)$me['partidos'] ?></td>
-                    <td><strong>Victorias</strong></td>
-                    <td><?= (int)$me['victorias'] ?> (<?= pct($me['porcentaje_victorias']) ?>%)</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
+    <div class="ranking-layout">
 
-    <div class="card-white">
-        <form class="search-bar" method="get">
-            <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar jugador por nombre">
-            <button type="submit">Buscar</button>
-            <?php if ($q !== ''): ?>
-                <a class="reset" href="?">Limpiar</a>
-            <?php endif; ?>
-        </form>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Posición</th>
-                    <th>Nombre</th>
-                    <th>Puntos</th>
-                    <th>Partidos</th>
-                    <th>Victorias</th>
-                    <th>% Victorias</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (!empty($rows)): ?>
-                    <?php $pos = $offset + 1; ?>
-                    <?php foreach ($rows as $row): 
-                        $isMe = ((int)$row['usuario_id'] === $userId);
-                    ?>
-                        <tr class="<?= $isMe ? 'tr-me' : '' ?>">
-                            <td><?= $pos ?></td>
-                            <td>
-                                <?= htmlspecialchars($row['nombre']) ?>
-                                <?= $isMe ? '<span class="badge-me">tú</span>' : '' ?>
-                            </td>
-                            <td><?= (int)$row['puntos'] ?></td>
-                            <td><?= (int)$row['partidos'] ?></td>
-                            <td><?= (int)$row['victorias'] ?></td>
-                            <td><?= pct($row['porcentaje_victorias']) ?>%</td>
+        <!-- COLUMNA IZQUIERDA: MIS DATOS -->
+        <?php if ($me): ?>
+        <div class="ranking-left">
+            <div class="card-white me-card">
+                <h2 class="stats-title">Estadísticas personales</h2>
+                <table>
+                    <tbody>
+                        <tr>
+                            <td><strong>Nombre</strong></td>
+                            <td><?= htmlspecialchars($me['nombre']) ?> <span class="badge-me">tú</span></td>
                         </tr>
-                        <?php $pos++; ?>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr><td colspan="6" style="text-align:center;">No hay datos de ranking</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
+                        <tr>
+                            <td><strong>Puntos</strong></td>
+                            <td><?= (int)$me['puntos'] ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Partidos</strong></td>
+                            <td><?= (int)$me['partidos'] ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Victorias</strong></td>
+                            <td><?= (int)$me['victorias'] ?> (<?= pct($me['porcentaje_victorias']) ?>%)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
 
-        <?php if ($totalPages > 1): ?>
-            <div class="pagination">
-                <?php $prev = max(1, $page-1); $next = min($totalPages, $page+1); $qParam = $q !== '' ? '&q='.urlencode($q) : ''; ?>
-                <?php if ($page > 1): ?>
-                    <a href="?page=<?= $prev . $qParam ?>">« Anterior</a>
-                <?php else: ?>
-                    <span class="disabled">« Anterior</span>
-                <?php endif; ?>
-
-                <?php for ($p=1; $p <= $totalPages; $p++): ?>
-                    <?php if ($p === $page): ?>
-                        <span class="active"><?= $p ?></span>
-                    <?php else: ?>
-                        <a href="?page=<?= $p . $qParam ?>"><?= $p ?></a>
+        <!-- COLUMNA DERECHA: RANKING GENERAL -->
+        <div class="ranking-right">
+            <div class="card-white">
+                <form class="search-bar" method="get">
+                    <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar jugador por nombre">
+                    <button type="submit">Buscar</button>
+                    <?php if ($q !== ''): ?>
+                        <a class="reset" href="?">Limpiar</a>
                     <?php endif; ?>
-                <?php endfor; ?>
+                </form>
 
-                <?php if ($page < $totalPages): ?>
-                    <a href="?page=<?= $next . $qParam ?>">Siguiente »</a>
-                <?php else: ?>
-                    <span class="disabled">Siguiente »</span>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Posición</th>
+                            <th>Nombre</th>
+                            <th>Puntos</th>
+                            <th>Partidos</th>
+                            <th>Victorias</th>
+                            <th>% Victorias</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($rows)): ?>
+                            <?php $pos = $offset + 1; ?>
+                            <?php foreach ($rows as $row): 
+                                $isMe = ((int)$row['usuario_id'] === $userId);
+                            ?>
+                                <tr class="<?= $isMe ? 'tr-me' : '' ?>">
+                                    <td><?= $pos ?></td>
+                                    <td>
+                                        <?= htmlspecialchars($row['nombre']) ?>
+                                        <?= $isMe ? '<span class="badge-me">tú</span>' : '' ?>
+                                    </td>
+                                    <td><?= (int)$row['puntos'] ?></td>
+                                    <td><?= (int)$row['partidos'] ?></td>
+                                    <td><?= (int)$row['victorias'] ?></td>
+                                    <td><?= pct($row['porcentaje_victorias']) ?>%</td>
+                                </tr>
+                                <?php $pos++; ?>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="6" style="text-align:center;">No hay datos de ranking</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+
+                <?php if ($totalPages > 1): ?>
+                <div class="pagination">
+                    <?php 
+                        $prev = max(1, $page-1); 
+                        $next = min($totalPages, $page+1); 
+                        $qParam = $q !== '' ? '&q='.urlencode($q) : ''; 
+                    ?>
+                    <?php if ($page > 1): ?>
+                        <a href="?page=<?= $prev . $qParam ?>">« Anterior</a>
+                    <?php else: ?>
+                        <span class="disabled">« Anterior</span>
+                    <?php endif; ?>
+
+                    <?php for ($p=1; $p <= $totalPages; $p++): ?>
+                        <?php if ($p === $page): ?>
+                            <span class="active"><?= $p ?></span>
+                        <?php else: ?>
+                            <a href="?page=<?= $p . $qParam ?>"><?= $p ?></a>
+                        <?php endif; ?>
+                    <?php endfor; ?>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a href="?page=<?= $next . $qParam ?>">Siguiente »</a>
+                    <?php else: ?>
+                        <span class="disabled">Siguiente »</span>
+                    <?php endif; ?>
+                </div>
                 <?php endif; ?>
             </div>
-        <?php endif; ?>
+        </div>
+
     </div>
 </div>
 

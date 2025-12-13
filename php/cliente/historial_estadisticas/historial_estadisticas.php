@@ -63,33 +63,7 @@ $result_reservas   = $stmt->get_result();
 $ultimas_reservas  = $result_reservas->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-/* Stats */
-$sql_stats = "
-    SELECT 
-        r.partidos     AS partidos_jugados,
-        r.victorias,
-        r.derrotas,
-        r.puntos,
-        ROUND((r.victorias / NULLIF(r.partidos, 0)) * 100, 0) AS porcentaje_victorias
-    FROM ranking r
-    WHERE r.usuario_id = ?
-    LIMIT 1
-";
-$stmt2 = $conn->prepare($sql_stats);
-$stmt2->bind_param("i", $userId);
-$stmt2->execute();
-$estadisticas = $stmt2->get_result()->fetch_assoc();
-$stmt2->close();
 
-if (!$estadisticas) {
-    $estadisticas = [
-        'partidos_jugados'     => 0,
-        'victorias'            => 0,
-        'derrotas'             => 0,
-        'puntos'               => 0,
-        'porcentaje_victorias' => 0
-    ];
-}
 
 /* helper badge */
 function estado_badge_class(string $estado): string {
@@ -120,90 +94,86 @@ table tbody tr:hover{ background:#f7fafb; }
 }
 .pagination .active{ background:#1bab9d; color:#fff; border-color:transparent; }
 .pagination .disabled{ color:#9ab3b5; background:#f3f7f7; }
+
+    .card-white .section-title {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 16px;
+        
+    }x
 </style>
 
 <div class="page-wrap">
     <h1 class="page-title">Historial y estadísticas</h1>
 
-    <div class="stats-container">
-        <div>
-            <h2 class="section-title">Últimas reservas</h2>
-            <div class="card-white">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Horario</th>
-                            <th>Club / Ubicación</th>
-                            <th>Cancha</th>
-                            <th>Estado</th>
-                            <th>Tu rol</th>
+ <div class="stats-container">
+    <div class="card-white">
+
+        <h2 class="section-title">Últimas reservas</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Horario</th>
+                    <th>Club / Ubicación</th>
+                    <th>Cancha</th>
+                    <th>Estado</th>
+                    <th>Tu rol</th>
+                </tr>
+            </thead>
+            <tbody id="reservas-tbody">
+                <?php if (!empty($ultimas_reservas)): ?>
+                    <?php foreach ($ultimas_reservas as $reserva): 
+                        $estado = (string)$reserva['estado'];
+                        $clsEstado = estado_badge_class($estado);
+                        $href = "/php/cliente/historial_estadisticas/detalle_reserva.php?reserva_id=".(int)$reserva['reserva_id'];
+                    ?>
+                        <tr class="row-link" tabindex="0" data-href="<?= htmlspecialchars($href) ?>">
+                            <td><?= htmlspecialchars($reserva['fecha']) ?></td>
+                            <td><?= htmlspecialchars(substr($reserva['hora_inicio'], 0, 5)) ?> - <?= htmlspecialchars(substr($reserva['hora_fin'], 0, 5)) ?></td>
+                            <td><?= nl2br(htmlspecialchars($reserva['ubicacion'])) ?></td>
+                            <td>#<?= (int)$reserva['cancha_id'] ?> — <?= htmlspecialchars($reserva['cancha_nombre']) ?></td>
+                            <td><span class="<?= $clsEstado ?>"><?= htmlspecialchars($estado) ?></span></td>
+                            <td><?= ((int)$reserva['es_creador'] === 1) ? 'Creador' : 'Invitado' ?></td>
                         </tr>
-                    </thead>
-                    <tbody id="reservas-tbody">
-                        <?php if (!empty($ultimas_reservas)): ?>
-                            <?php foreach ($ultimas_reservas as $reserva): 
-                                $estado = (string)$reserva['estado'];
-                                $clsEstado = estado_badge_class($estado);
-                                $href = "/php/cliente/historial_estadisticas/detalle_reserva.php?reserva_id=".(int)$reserva['reserva_id'];
-                            ?>
-                                <tr class="row-link" tabindex="0" data-href="<?= htmlspecialchars($href) ?>">
-                                    <td><?= htmlspecialchars($reserva['fecha']) ?></td>
-                                    <td><?= htmlspecialchars(substr($reserva['hora_inicio'], 0, 5)) ?> - <?= htmlspecialchars(substr($reserva['hora_fin'], 0, 5)) ?></td>
-                                    <td><?= nl2br(htmlspecialchars($reserva['ubicacion'])) ?></td>
-                                    <td>#<?= (int)$reserva['cancha_id'] ?> — <?= htmlspecialchars($reserva['cancha_nombre']) ?></td>
-                                    <td><span class="<?= $clsEstado ?>"><?= htmlspecialchars($estado) ?></span></td>
-                                    <td><?= ((int)$reserva['es_creador'] === 1) ? 'Creador' : 'Invitado' ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="6" style="text-align:center;">No tienes reservas aún</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="6" style="text-align:center;">No tienes reservas aún</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
 
-                <!-- Paginación -->
-                <?php if ($totalPages > 1): ?>
-                    <div class="pagination">
-                        <?php $prev = max(1, $page-1); $next = min($totalPages, $page+1); ?>
-                        <?php if ($page > 1): ?>
-                            <a href="?page=<?= $prev ?>">« Anterior</a>
-                        <?php else: ?>
-                            <span class="disabled">« Anterior</span>
-                        <?php endif; ?>
+        <!-- Paginación -->
+        <?php if ($totalPages > 1): ?>
+            <div class="pagination">
+                <?php $prev = max(1, $page-1); $next = min($totalPages, $page+1); ?>
 
-                        <?php for ($p=1; $p <= $totalPages; $p++): ?>
-                            <?php if ($p === $page): ?>
-                                <span class="active"><?= $p ?></span>
-                            <?php else: ?>
-                                <a href="?page=<?= $p ?>"><?= $p ?></a>
-                            <?php endif; ?>
-                        <?php endfor; ?>
+                <?php if ($page > 1): ?>
+                    <a href="?page=<?= $prev ?>">« Anterior</a>
+                <?php else: ?>
+                    <span class="disabled">« Anterior</span>
+                <?php endif; ?>
 
-                        <?php if ($page < $totalPages): ?>
-                            <a href="?page=<?= $next ?>">Siguiente »</a>
-                        <?php else: ?>
-                            <span class="disabled">Siguiente »</span>
-                        <?php endif; ?>
-                    </div>
+                <?php for ($p=1; $p <= $totalPages; $p++): ?>
+                    <?php if ($p === $page): ?>
+                        <span class="active"><?= $p ?></span>
+                    <?php else: ?>
+                        <a href="?page=<?= $p ?>"><?= $p ?></a>
+                    <?php endif; ?>
+                <?php endfor; ?>
+
+                <?php if ($page < $totalPages): ?>
+                    <a href="?page=<?= $next ?>">Siguiente »</a>
+                <?php else: ?>
+                    <span class="disabled">Siguiente »</span>
                 <?php endif; ?>
             </div>
-        </div>
+        <?php endif; ?>
 
-        <div>
-            <h2 class="section-title">Estadísticas</h2>
-            <div class="card-white">
-                <table>
-                    <tbody>
-                        <tr><td class="label-stat">Partidos jugados</td><td class="value-stat"><?= (int)$estadisticas['partidos_jugados'] ?></td></tr>
-                        <tr><td class="label-stat">Victorias</td><td class="value-stat"><?= (int)$estadisticas['victorias'] ?></td></tr>
-                        <tr><td class="label-stat">Derrotas</td><td class="value-stat"><?= (int)$estadisticas['derrotas'] ?></td></tr>
-                        <tr><td class="label-stat">% de Victorias</td><td class="value-stat"><?= (int)$estadisticas['porcentaje_victorias'] ?>%</td></tr>
-                        <tr><td class="label-stat">Puntos</td><td class="value-stat"><?= (int)$estadisticas['puntos'] ?></td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -213,6 +183,6 @@ document.querySelectorAll('.row-link').forEach(function(row){
     row.addEventListener('click', function(){ window.location.href = this.dataset.href; });
     row.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ window.location.href = this.dataset.href; }});
 });
-</script>
+</script> 
 
 <?php include './../includes/footer.php'; ?>

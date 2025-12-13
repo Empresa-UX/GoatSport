@@ -75,7 +75,7 @@ $avatarInitial = strtoupper(mb_substr($userName, 0, 1, 'UTF-8'));
         <div class="header-right">
             <nav>
                 <a href="/php/cliente/home_cliente.php">Inicio</a>
-                <a href="/php/cliente/historial_estadisticas/historial_estadisticas.php">Mis reservas y estadísticas</a>
+                <a href="/php/cliente/historial_estadisticas/historial_estadisticas.php">reservas y estadísticas</a>
                 <a href="/php/cliente/ranking/ranking.php">Ranking</a>
                 <a href="/php/cliente/torneos/torneos.php">Torneos</a>
                 <a href="/php/cliente/reportes/reportes.php">Reportes</a>

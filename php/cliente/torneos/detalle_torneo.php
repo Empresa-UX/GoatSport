@@ -21,11 +21,10 @@ function fmt_md(string $d): string {
 function comienza_label($n){
   if ($n === null) return '—';
   $n = (int)$n;
-  if ($n > 1) return "En $n días";
-  if ($n === 1) return "Mañana";
-  if ($n === 0) return "Hoy";
-  if ($n === -1) return "Ayer";
-  return "Hace ".abs($n)." días";
+  if ($n > 1) return "Comienza en $n días";
+  if ($n === 1) return "Comienza mañana";
+  if ($n === 0) return "Comienza hoy";
+  return "Terminado";
 }
 function badge_estado($e){
   $base='display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid;';
