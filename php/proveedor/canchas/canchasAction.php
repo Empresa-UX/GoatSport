@@ -32,7 +32,7 @@ if ($action === 'add') {
     ";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param(
-        "isssidssii",
+        "sssidsiiiii",
         $proveedor_id,
         $nombre,
         $ubicacion,

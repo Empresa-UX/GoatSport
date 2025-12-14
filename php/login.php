@@ -172,6 +172,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .extra-links a:hover {
             text-decoration: underline;
         }
+
+        .extra-link-prove {
+            margin-top: 18px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .extra-link-prove a {
+            color: #1bab9dff;
+            text-decoration: none;
+        }
+
+        .extra-link-prove a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 
@@ -208,9 +223,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="extra-links">
             <a href="register.php">¿No tienes una cuenta?</a>
             <a href="forgot.php">¿Olvidaste tu contraseña?</a>
-            
         </div>
-    </div>
+
+         <div class="extra-link-prove">
+            <div>
+                <a href="register_prove.php">¿Sos proveedor? Ingresá acá</a>
+            </div>
+        </div>
 
 </body>
 
