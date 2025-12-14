@@ -24,30 +24,65 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $puntos = 0;
         $fecha_registro = date("Y-m-d H:i:s");
 
-        // Insertar nuevo usuario
-        $insert = $conn->prepare("INSERT INTO usuarios (nombre, email, contrasenia, rol, puntos, fecha_registro) 
-                                  VALUES (?, ?, ?, ?, ?, ?)");
-        $insert->bind_param("ssssis", $nombre, $email, $password, $rol, $puntos, $fecha_registro);
-
-        if ($insert->execute()) {
-            $_SESSION['usuario_id'] = $insert->insert_id;
+        // INICIAR TRANSACCIÓN para asegurar que todo se guarde o nada
+        $conn->begin_transaction();
+        
+        try {
+            // 1. Insertar nuevo usuario en tabla usuarios
+            $insert = $conn->prepare("INSERT INTO usuarios (nombre, email, contrasenia, rol, fecha_registro) 
+                                      VALUES (?, ?, ?, ?, ?)");
+            $insert->bind_param("sssss", $nombre, $email, $password, $rol, $fecha_registro);
+            
+            if (!$insert->execute()) {
+                throw new Exception("Error al insertar en usuarios: " . $insert->error);
+            }
+            
+            // Obtener el ID del usuario recién creado
+            $nuevo_user_id = $insert->insert_id;
+            $insert->close();
+            
+            // 2. Insertar registro en cliente_detalle (solo con cliente_id, otros campos NULL)
+            $insert_cliente = $conn->prepare("INSERT INTO cliente_detalle (cliente_id) VALUES (?)");
+            $insert_cliente->bind_param("i", $nuevo_user_id);
+            
+            if (!$insert_cliente->execute()) {
+                throw new Exception("Error al insertar en cliente_detalle: " . $insert_cliente->error);
+            }
+            $insert_cliente->close();
+            
+            // 3. Insertar registro inicial en ranking (todos en 0)
+            // CORREGIDO: Usar 'derrotas' en lugar de 'derrotas_'
+            $insert_ranking = $conn->prepare("INSERT INTO ranking (usuario_id, puntos, partidos, victorias, derrotas) 
+                                             VALUES (?, 0, 0, 0, 0)");
+            $insert_ranking->bind_param("i", $nuevo_user_id);
+            
+            if (!$insert_ranking->execute()) {
+                throw new Exception("Error al insertar en ranking: " . $insert_ranking->error);
+            }
+            $insert_ranking->close();
+            
+            // 4. CONFIRMAR TODAS LAS INSERCIONES
+            $conn->commit();
+            
+            // Configurar sesión
+            $_SESSION['usuario_id'] = $nuevo_user_id;
             $_SESSION['usuario_email'] = $email;
             $_SESSION['rol'] = "cliente";
 
             header("Location: ./cliente/home_cliente.php");
             exit();
-        } else {
-            $mensaje = "<p class='error'>⚠️ Error al registrarse. Intenta de nuevo.</p>";
+            
+        } catch (Exception $e) {
+            // 5. Si algo falla, REVERTIR todo
+            $conn->rollback();
+            $mensaje = "<p class='error'>⚠️ Error en el registro: " . htmlspecialchars($e->getMessage()) . "</p>";
         }
-
-        $insert->close();
     }
 
     $stmt->close();
     $conn->close();
 }
 ?>
-
 
 <!DOCTYPE html>
 <html lang="es">
@@ -158,6 +193,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         .extra-links a:hover {
             text-decoration: underline;
+        }
+        
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
         }
     </style>
 </head>

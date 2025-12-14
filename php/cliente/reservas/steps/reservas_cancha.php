@@ -8,16 +8,17 @@ try {
     // Obtener todas las canchas con barrio Y dirección del club
     $sql = "
       SELECT 
-        c.cancha_id, c.nombre, c.ubicacion, c.tipo, c.capacidad, c.precio, 
-        c.proveedor_id, c.barrio,
+        c.cancha_id, c.nombre, c.tipo, c.capacidad, c.precio, 
+        c.proveedor_id,
         COALESCE(pd.nombre_club, u.nombre) AS club_nombre,
-        pd.direccion AS club_direccion,
-        pd.ciudad AS club_ciudad
+        pd.direccion AS club_direccion,  -- Dirección del club
+        pd.ciudad AS club_ciudad,
+        pd.barrio AS club_barrio
       FROM canchas c
       LEFT JOIN proveedores_detalle pd ON pd.proveedor_id = c.proveedor_id
       LEFT JOIN usuarios u            ON u.user_id       = c.proveedor_id
-      WHERE c.barrio IS NOT NULL AND TRIM(c.barrio) != ''
-      ORDER BY c.barrio, pd.nombre_club, c.tipo, c.nombre
+      WHERE pd.barrio IS NOT NULL AND TRIM(pd.barrio) != ''
+      ORDER BY pd.barrio, pd.nombre_club, c.tipo, c.nombre
     ";
     $result = $conn->query($sql);
     if (!$result) throw new Exception($conn->error);
@@ -25,20 +26,20 @@ try {
     $canchasPorTipo = ['clasica'=>[], 'cubierta'=>[], 'panoramica'=>[]];
     $barrios = [];
     $clubesPorBarrio = [];
-    $todosLosClubes = []; // Para mostrar cuando no hay barrio seleccionado
+    $todosLosClubes = [];
     
     while ($row = $result->fetch_assoc()) {
         $tipo = strtolower(trim($row['tipo']));
         if (!isset($canchasPorTipo[$tipo])) $canchasPorTipo[$tipo] = [];
         
-        $barrio = trim($row['barrio']);
+        $barrio = trim($row['club_barrio']);
         $club = $row['club_nombre'] ?: 'Club';
-        $direccion = $row['club_direccion'] ?: ($row['ubicacion'] ?: '');
+        $direccion = $row['club_direccion'] ?: 'Dirección no disponible';  // Usamos direccion del club
         $ciudad = $row['club_ciudad'] ?: '';
         
         // Construir dirección completa
         $direccionCompleta = '';
-        if ($direccion) {
+        if ($direccion && $direccion !== 'Dirección no disponible') {
             $direccionCompleta = $direccion;
             if ($ciudad && $ciudad !== $barrio) {
                 $direccionCompleta .= ', ' . $ciudad;
@@ -52,7 +53,7 @@ try {
             $barrios[] = $barrio;
         }
         
-        // Organizar clubes por barrio con sus datos completos
+        // Organizar clubes por barrio
         if (!isset($clubesPorBarrio[$barrio])) {
             $clubesPorBarrio[$barrio] = [];
         }
@@ -91,6 +92,7 @@ try {
         
         // Guardar cancha con datos del club
         $row['club_direccion_completa'] = $direccionCompleta;
+        $row['club_barrio'] = $barrio;
         $canchasPorTipo[$tipo][] = $row;
     }
     
@@ -383,7 +385,7 @@ foreach (['clasica','cubierta','panoramica'] as $t) {
       <div class="controls">
         <!-- Filtro por barrio -->
         <select id="filtro-barrio" class="barrio-filter">
-          <option value="">Todos los clubes</option>  <!-- CAMBIADO AQUÍ -->
+          <option value="">Todos los clubes</option>
           <?php foreach ($barrios as $barrio): ?>
             <option value="<?= htmlspecialchars($barrio) ?>"><?= htmlspecialchars($barrio) ?></option>
           <?php endforeach; ?>
@@ -416,9 +418,8 @@ foreach (['clasica','cubierta','panoramica'] as $t) {
                   $name   = $c['nombre'];
                   $caps   = (int)$c['capacidad'];
                   $uid    = (int)$c['cancha_id'];
-                  $barrio = $c['barrio'] ?: '';
-                  $ubicacion = $c['ubicacion'] ?: '';
-                  $direccionClub = $c['club_direccion_completa'] ?: '';
+                  $barrio = $c['club_barrio'] ?: '';
+                  $direccionClub = $c['club_direccion_completa'] ?: '';  // Usamos direccion del club
               ?>
                 <div class="item" 
                      tabindex="0"
@@ -426,7 +427,6 @@ foreach (['clasica','cubierta','panoramica'] as $t) {
                      data-nombre="<?= htmlspecialchars($name) ?>"
                      data-club="<?= htmlspecialchars($club) ?>"
                      data-barrio="<?= htmlspecialchars($barrio) ?>"
-                     data-ubicacion="<?= htmlspecialchars($ubicacion) ?>"
                      data-direccion-club="<?= htmlspecialchars($direccionClub) ?>"
                      data-capacidad="<?= $caps ?>"
                      data-precio="<?= (float)$c['precio'] ?>"

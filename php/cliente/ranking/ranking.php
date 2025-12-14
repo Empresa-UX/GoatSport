@@ -11,11 +11,30 @@ $page     = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset   = ($page - 1) * $pageSize;
 $q        = isset($_GET['q']) ? trim($_GET['q']) : '';
 
+/* --- OBTENER NOMBRE DEL USUARIO desde Cliente_detalle --- */
+$nombreUsuario = '';
+if ($userId > 0) {
+    $stmtNombre = $conn->prepare("
+        SELECT u.nombre 
+        FROM usuarios u
+        INNER JOIN Cliente_detalle cd ON u.user_id = cd.cliente_id
+        WHERE cd.cliente_id = ?
+    ");
+    $stmtNombre->bind_param("i", $userId);
+    $stmtNombre->execute();
+    $resultNombre = $stmtNombre->get_result();
+    if ($rowNombre = $resultNombre->fetch_assoc()) {
+        $nombreUsuario = htmlspecialchars($rowNombre['nombre']);
+    }
+    $stmtNombre->close();
+}
+
 /* --- COUNT (filtrado por nombre, si aplica) --- */
 $sqlCount = "
     SELECT COUNT(*) AS total
-    FROM ranking r
-    INNER JOIN usuarios u ON r.usuario_id = u.user_id
+    FROM Cliente_detalle cd
+    INNER JOIN usuarios u ON cd.cliente_id = u.user_id
+    LEFT JOIN ranking r ON cd.cliente_id = r.usuario_id
     WHERE (? = '' OR u.nombre LIKE CONCAT('%', ?, '%'))
 ";
 $stmtC = $conn->prepare($sqlCount);
@@ -29,17 +48,24 @@ $totalPages = max(1, (int)ceil($totalRows / $pageSize));
 /* --- LIST (misma condición, orden + paginación) --- */
 $sql = "
     SELECT 
-        r.ranking_id,
-        r.usuario_id,
+        cd.cliente_id AS usuario_id,
         u.nombre,
-        r.puntos,
-        r.partidos,
-        r.victorias,
-        ROUND((r.victorias / NULLIF(r.partidos, 0)) * 100, 0) AS porcentaje_victorias
-    FROM ranking r
-    INNER JOIN usuarios u ON r.usuario_id = u.user_id
+        COALESCE(r.puntos, 0) AS puntos,
+        COALESCE(r.partidos, 0) AS partidos,
+        COALESCE(r.victorias, 0) AS victorias,
+        CASE 
+            WHEN COALESCE(r.partidos, 0) = 0 THEN 0
+            ELSE ROUND((COALESCE(r.victorias, 0) / r.partidos) * 100, 0)
+        END AS porcentaje_victorias
+    FROM Cliente_detalle cd
+    INNER JOIN usuarios u ON cd.cliente_id = u.user_id
+    LEFT JOIN ranking r ON cd.cliente_id = r.usuario_id
     WHERE (? = '' OR u.nombre LIKE CONCAT('%', ?, '%'))
-    ORDER BY r.puntos DESC, r.victorias DESC, r.partidos DESC, r.usuario_id ASC
+    ORDER BY 
+        puntos DESC,
+        victorias DESC,
+        partidos DESC,
+        usuario_id ASC
     LIMIT ? OFFSET ?
 ";
 $stmt = $conn->prepare($sql);
@@ -49,15 +75,24 @@ $result = $stmt->get_result();
 $rows   = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 $stmt->close();
 
-/* --- Mis datos (para resaltar/mostrar arriba opcional) --- */
+/* --- Mis datos (si existe en ranking, sino valores por defecto) --- */
 $me = null;
 if ($userId > 0) {
     $stmMe = $conn->prepare("
-        SELECT r.usuario_id, u.nombre, r.puntos, r.partidos, r.victorias,
-               ROUND((r.victorias / NULLIF(r.partidos, 0)) * 100, 0) AS porcentaje_victorias
-        FROM ranking r
-        JOIN usuarios u ON u.user_id = r.usuario_id
-        WHERE r.usuario_id = ?
+        SELECT 
+            cd.cliente_id AS usuario_id,
+            u.nombre,
+            COALESCE(r.puntos, 0) AS puntos,
+            COALESCE(r.partidos, 0) AS partidos,
+            COALESCE(r.victorias, 0) AS victorias,
+            CASE 
+                WHEN COALESCE(r.partidos, 0) = 0 THEN 0
+                ELSE ROUND((COALESCE(r.victorias, 0) / r.partidos) * 100, 0)
+            END AS porcentaje_victorias
+        FROM Cliente_detalle cd
+        INNER JOIN usuarios u ON cd.cliente_id = u.user_id
+        LEFT JOIN ranking r ON cd.cliente_id = r.usuario_id
+        WHERE cd.cliente_id = ?
         LIMIT 1
     ");
     $stmMe->bind_param("i", $userId);
@@ -125,8 +160,7 @@ table tbody tr:hover{ background:#f7fafb; }
 
     <div class="ranking-layout">
 
-        <!-- COLUMNA IZQUIERDA: MIS DATOS -->
-        <?php if ($me): ?>
+        <!-- COLUMNA IZQUIERDA: MIS DATOS - SIEMPRE VISIBLE -->
         <div class="ranking-left">
             <div class="card-white me-card">
                 <h2 class="stats-title">Estadísticas personales</h2>
@@ -134,25 +168,27 @@ table tbody tr:hover{ background:#f7fafb; }
                     <tbody>
                         <tr>
                             <td><strong>Nombre</strong></td>
-                            <td><?= htmlspecialchars($me['nombre']) ?> <span class="badge-me">tú</span></td>
+                            <td>
+                                <?= $nombreUsuario ?: 'Usuario' ?>
+                                <?php if ($userId > 0): ?><span class="badge-me">tú</span><?php endif; ?>
+                            </td>
                         </tr>
                         <tr>
                             <td><strong>Puntos</strong></td>
-                            <td><?= (int)$me['puntos'] ?></td>
+                            <td><?= $me ? (int)$me['puntos'] : '0' ?></td>
                         </tr>
                         <tr>
                             <td><strong>Partidos</strong></td>
-                            <td><?= (int)$me['partidos'] ?></td>
+                            <td><?= $me ? (int)$me['partidos'] : '0' ?></td>
                         </tr>
                         <tr>
                             <td><strong>Victorias</strong></td>
-                            <td><?= (int)$me['victorias'] ?> (<?= pct($me['porcentaje_victorias']) ?>%)</td>
+                            <td><?= $me ? (int)$me['victorias'] : '0' ?> (<?= $me ? pct($me['porcentaje_victorias']) : '0' ?>%)</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
-        <?php endif; ?>
 
         <!-- COLUMNA DERECHA: RANKING GENERAL -->
         <div class="ranking-right">
