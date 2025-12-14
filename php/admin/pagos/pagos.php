@@ -150,9 +150,9 @@ ksort($proveedores, SORT_NATURAL | SORT_FLAG_CASE);
     .col-reserva  { width:80px; }
     .col-jugador  { width:180px; }
     .col-provcan  { width:240px; }
-    .col-metodo   { width:120px; }
+    .col-metodo   { width:120px; text-align: center;}
     .col-monto    { width:110px; }
-    .col-estado   { width:120px; }
+    .col-estado   { width:120px; text-align: center;}
     .col-fecha    { width:80px; }
 
     .money{ white-space:nowrap; }

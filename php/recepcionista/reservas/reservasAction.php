@@ -6,6 +6,10 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../../config.php';
 
+if (function_exists('date_default_timezone_set')) {
+  @date_default_timezone_set('America/Argentina/Buenos_Aires');
+}
+
 $recepcionista_id = (int) $_SESSION['usuario_id'];
 $proveedor_id     = (int) ($_SESSION['proveedor_id'] ?? 0);
 $action           = $_POST['action'] ?? '';
@@ -77,7 +81,7 @@ function gen_unique_guest_email(mysqli $conn): string {
   } while ($exists !== null);
   return $candidate;
 }
-/* Crea usuario “fantasma” (por FK) y lo marca en invitados; sin email de UI. */
+/* crea usuario invitado para usar como titular/participante */
 function create_marked_invited_user(mysqli $conn, string $nombre): int {
   $nombre = trim($nombre);
   if ($nombre === '') return 0;
@@ -99,18 +103,16 @@ function create_marked_invited_user(mysqli $conn, string $nombre): int {
 
   return $uid;
 }
-/* 'reg' => usa ID; 'inv' => crea usuario marcado en invitados. */
 function resolve_player(mysqli $conn, string $mode, ?int $sel_id, ?string $nombre): int {
   $mode = ($mode === 'inv') ? 'inv' : 'reg';
   if ($mode === 'reg') {
     $id = (int)($sel_id ?? 0);
     return $id > 0 ? $id : 0;
-    }
+  }
   $nombre = trim((string)$nombre);
   if ($nombre === '') return 0;
   return create_marked_invited_user($conn, $nombre);
 }
-/* Torneo sombra para cumplir FK NOT NULL en partidos.torneo_id */
 function get_or_create_shadow_torneo(mysqli $conn, int $proveedor_id, int $creador_id): int {
   $nombre = 'Amistosos (auto)';
   $q = $conn->prepare("SELECT torneo_id FROM torneos WHERE proveedor_id=? AND nombre=? LIMIT 1");
@@ -127,6 +129,22 @@ function get_or_create_shadow_torneo(mysqli $conn, int $proveedor_id, int $cread
   $torneo_id = (int)$ins->insert_id;
   $ins->close();
   return $torneo_id;
+}
+
+/* ====== Validadores comunes ====== */
+function assert_not_past(string $fecha, string $hora_inicio): void {
+  $today = date('Y-m-d'); $now = date('H:i');
+  if ($fecha < $today) redirect_err('La fecha no puede ser pasada.');
+  if ($fecha === $today && $hora_inicio < $now) redirect_err('La hora de inicio no puede ser en el pasado.');
+}
+function cancha_capacidad_match(mysqli $conn, int $proveedor_id, int $cancha_id, string $tipo_reserva): void {
+  $q=$conn->prepare("SELECT capacidad FROM canchas WHERE cancha_id=? AND proveedor_id=? AND activa=1 LIMIT 1");
+  $q->bind_param("ii",$cancha_id,$proveedor_id);
+  $q->execute(); $q->bind_result($cap);
+  if(!$q->fetch()){ $q->close(); redirect_err('Cancha inválida o inactiva.'); }
+  $q->close();
+  $need = ($tipo_reserva==='equipo') ? 4 : 2;
+  if ((int)$cap !== $need) redirect_err('La cancha seleccionada no coincide con el tipo de reserva.');
 }
 
 /* ----- API: preview promos ----- */
@@ -164,6 +182,10 @@ if ($action === 'add') {
   if ($cliente_nombre==='') redirect_err('Ingrese nombre y apellido del cliente.');
   if (!in_array($metodo, ['club','tarjeta','mercado_pago'], true)) redirect_err('Seleccione un método de pago válido.');
 
+  // Validaciones nuevas
+  assert_not_past($fecha, $hora_inicio);
+  cancha_capacidad_match($conn, $proveedor_id, $cancha_id, $tipo_reserva);
+
   if ($split_costs) {
     $esperados = ($tipo_reserva==='equipo') ? 3 : 1;
     $validos = array_values(array_filter($split_names, fn($s)=>$s!==''));
@@ -193,7 +215,10 @@ if ($action === 'add') {
   $st2->bind_param("issss",$cancha_id,$fin_dt,$ini_dt,$ini_dt,$fin_dt);
   $st2->execute(); $st2->store_result(); if($st2->num_rows>0){ $st2->close(); redirect_err('Conflicto con un evento especial.'); } $st2->close();
 
-  $creador_id = $recepcionista_id;
+  // titular del pago = cliente (crear invitado) y usarlo también como CREADOR de la reserva
+  $titular_id = create_marked_invited_user($conn, $cliente_nombre);
+  if ($titular_id <= 0) redirect_err('No se pudo registrar al cliente como titular del pago.');
+  $creador_id = $titular_id;
 
   [$promos_aplic, $pct_total, $precio_base, $precio_final] =
     compute_promos($conn, $proveedor_id, $cancha_id, $fecha, $hora_inicio, $duracion);
@@ -208,18 +233,19 @@ if ($action === 'add') {
     $reserva_id=(int)$st->insert_id; $st->close();
 
     // Estado de pago
-    if ($metodo === 'club') { $estado_pago = 'pagado'; }
-    else { $estado_pago = ($tipo_reserva === 'equipo') ? 'pendiente' : ($split_costs ? 'pendiente' : 'pagado'); }
+    $estado_pago = ($metodo==='club') ? 'pagado' : ( ($tipo_reserva==='equipo' || $split_costs) ? 'pendiente' : 'pagado' );
     $fecha_pago  = ($estado_pago==='pagado') ? date('Y-m-d H:i:s') : null;
 
     $detalle = $split_costs ? ('Dividir costos; integrantes: '.$cliente_nombre.' | '.implode(' | ', array_values(array_filter($split_names)))) : null;
 
+    // Pago a nombre del CLIENTE (titular)
     $stp=$conn->prepare("INSERT INTO pagos (reserva_id, jugador_id, monto, metodo, estado, fecha_pago, detalle) VALUES (?,?,?,?,?,?,?)");
-    $stp->bind_param("iidssss",$reserva_id,$creador_id,$precio_final,$metodo,$estado_pago,$fecha_pago,$detalle);
+    $stp->bind_param("iidssss",$reserva_id,$titular_id,$precio_final,$metodo,$estado_pago,$fecha_pago,$detalle);
     if(!$stp->execute()) throw new Exception('No se pudo registrar el pago.');
     $stp->close();
 
     /* ===== Crear partido si se pidió ===== */
+    $partido_id = null;
     if ($crear_partido) {
       $p1_mode = $_POST['p1_mode'] ?? 'reg';
       $p2_mode = $_POST['p2_mode'] ?? 'reg';
@@ -236,7 +262,7 @@ if ($action === 'add') {
 
       if ($j1_id === $j2_id) throw new Exception('Los jugadores no pueden ser el mismo usuario.');
 
-      $torneo_id = get_or_create_shadow_torneo($conn, $proveedor_id, $creador_id);
+      $torneo_id = get_or_create_shadow_torneo($conn, $proveedor_id, $recepcionista_id);
       if ($torneo_id <= 0) throw new Exception('No se pudo preparar el torneo para el partido.');
 
       $fecha_partido = $ini_dt . ':00';
@@ -248,7 +274,7 @@ if ($action === 'add') {
       $ip->close();
     }
 
-    // Notificaciones
+    // Notificaciones - reserva
     $tipo='reserva_nueva'; $origen='recepcion';
     $titulo="Nueva reserva walk-in #{$reserva_id}";
     $msgA="Reserva creada desde recepción para {$cliente_nombre}.";
@@ -259,10 +285,20 @@ if ($action === 'add') {
     $stP=$conn->prepare("INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje) VALUES (?,?,?,?,?)");
     $stP->bind_param("issss",$proveedor_id,$tipo,$origen,$titulo,$msgP); if(!$stP->execute()) throw new Exception('No se pudo notificar proveedor.'); $stP->close();
 
+    // Notificaciones - partido (si hubo)
+    if ($partido_id) {
+      $tipo2='partido_nuevo'; $tit2="Partido creado #{$partido_id} (reserva #{$reserva_id})";
+      $msg2="Se creó un partido a partir de una reserva sin cita previa para {$fecha} {$hora_inicio}-{$hora_fin}.";
+      $stAp=$conn->prepare("INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje) SELECT user_id, ?, ?, ?, ? FROM usuarios WHERE rol='admin'");
+      $stAp->bind_param("ssss",$tipo2,$origen,$tit2,$msg2); $stAp->execute(); $stAp->close();
+      $stPp=$conn->prepare("INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje) VALUES (?,?,?,?,?)");
+      $stPp->bind_param("issss",$proveedor_id,$tipo2,$origen,$tit2,$msg2); $stPp->execute(); $stPp->close();
+    }
+
     $conn->commit();
 
     $ok = "Reserva #$reserva_id creada.";
-    if (!empty($partido_id ?? null)) $ok .= " Partido #$partido_id creado.";
+    if (!empty($partido_id)) $ok .= " Partido #$partido_id creado.";
     redirect_ok($ok);
   } catch (Throwable $e) {
     $conn->rollback();
@@ -270,7 +306,7 @@ if ($action === 'add') {
   }
 }
 
-/* marcar pagado (sin cambios) */
+/* ----- marcar pagado ----- */
 if ($action === 'mark_paid') {
   $pago_id = (int)($_POST['pago_id'] ?? 0);
   if ($pago_id <= 0) redirect_err('Pago inválido.');
@@ -304,4 +340,134 @@ if ($action === 'mark_paid') {
   redirect_ok('Pago confirmado.');
 }
 
+/* ----- eliminar reserva (+ borra partido ligado) ----- */
+if ($action === 'delete') {
+  $reserva_id = (int)($_POST['reserva_id'] ?? 0);
+  if ($reserva_id<=0) redirect_err('Reserva inválida.');
+
+  $q=$conn->prepare("SELECT r.reserva_id, r.fecha, r.hora_inicio, r.hora_fin, c.proveedor_id FROM reservas r JOIN canchas c ON c.cancha_id=r.cancha_id WHERE r.reserva_id=? AND c.proveedor_id=? LIMIT 1");
+  $q->bind_param("ii",$reserva_id,$proveedor_id);
+  $q->execute(); $row=$q->get_result()->fetch_assoc(); $q->close();
+  if(!$row) redirect_err('No autorizado.');
+
+  // Borrar partido/s asociados a la reserva
+  $delPart=$conn->prepare("DELETE FROM partidos WHERE reserva_id=?");
+  $delPart->bind_param("i",$reserva_id);
+  $delPart->execute(); $delPart->close();
+
+  // Borrar reserva
+  $del=$conn->prepare("DELETE FROM reservas WHERE reserva_id=? LIMIT 1");
+  $del->bind_param("i",$reserva_id);
+  if(!$del->execute()){ $del->close(); redirect_err('No se pudo eliminar la reserva.'); }
+  $del->close();
+
+  $tipo='reserva_eliminada'; $origen='recepcion';
+  $titulo="Reserva eliminada #{$reserva_id}";
+  $mensaje="Se eliminó la reserva #{$reserva_id} programada para {$row['fecha']} {$row['hora_inicio']}-{$row['hora_fin']}.";
+
+  $stA=$conn->prepare("INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje) SELECT user_id, ?, ?, ?, ? FROM usuarios WHERE rol='admin'");
+  $stA->bind_param("ssss",$tipo,$origen,$titulo,$mensaje); $stA->execute(); $stA->close();
+
+  $stP=$conn->prepare("INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje) VALUES (?,?,?,?,?)");
+  $stP->bind_param("issss",$proveedor_id,$tipo,$origen,$titulo,$mensaje); $stP->execute(); $stP->close();
+
+  redirect_ok("Reserva #{$reserva_id} eliminada.");
+}
+
+/* ----- editar reserva (actualiza CREADOR si cambia el Cliente) ----- */
+if ($action === 'edit') {
+  $reserva_id    = (int)($_POST['reserva_id'] ?? 0);
+  $cancha_id     = (int)($_POST['cancha_id'] ?? 0);
+  $fecha         = trim($_POST['fecha'] ?? '');
+  $hora_inicio   = trim($_POST['hora_inicio'] ?? '');
+  $duracion      = max(0, (int)($_POST['duracion'] ?? 0));
+  $tipo_reserva  = $_POST['tipo_reserva'] ?? 'individual';
+  $metodo        = $_POST['metodo'] ?? 'club';
+  $cliente_nombre= trim($_POST['cliente_nombre'] ?? '');
+
+  if ($reserva_id<=0 || $cancha_id<=0 || $fecha==='' || $hora_inicio==='' || $duracion<=0) redirect_err('Datos incompletos.');
+
+  // Validaciones nuevas
+  assert_not_past($fecha, $hora_inicio);
+  cancha_capacidad_match($conn, $proveedor_id, $cancha_id, $tipo_reserva);
+
+  // validar propiedad + traer creador actual
+  $q=$conn->prepare("
+    SELECT r.reserva_id, r.creador_id, u.nombre AS creador_nombre
+    FROM reservas r
+    JOIN canchas c ON c.cancha_id=r.cancha_id
+    JOIN usuarios u ON u.user_id=r.creador_id
+    WHERE r.reserva_id=? AND c.proveedor_id=?
+    LIMIT 1
+  ");
+  $q->bind_param("ii",$reserva_id,$proveedor_id);
+  $q->execute(); $cur=$q->get_result()->fetch_assoc(); $q->close();
+  if(!$cur) redirect_err('No autorizado.');
+
+  // calcular fin
+  $t_inicio = strtotime("$fecha $hora_inicio");
+  if($t_inicio===false) redirect_err('Hora inválida.');
+  $hora_fin = date('H:i:s', $t_inicio + ($duracion*60));
+
+  // conflicto con otras reservas (excluyéndose)
+  $st1=$conn->prepare("SELECT 1 FROM reservas WHERE cancha_id=? AND fecha=? AND estado <> 'cancelada' AND reserva_id<>? AND NOT (hora_fin <= ? OR hora_inicio >= ?) LIMIT 1");
+  $st1->bind_param("isiss",$cancha_id,$fecha,$reserva_id,$hora_inicio,$hora_fin);
+  $st1->execute(); $st1->store_result(); if($st1->num_rows>0){ $st1->close(); redirect_err('Conflicto con otra reserva.'); } $st1->close();
+
+  // promos y precio final
+  [$promos_aplic, $pct_total, $precio_base, $precio_final] =
+    compute_promos($conn, $proveedor_id, $cancha_id, $fecha, $hora_inicio, $duracion);
+
+  // decidir nuevo creador (si cambió el nombre)
+  $creador_id_nuevo = (int)$cur['creador_id'];
+  if ($cliente_nombre !== '' && mb_strtolower(trim($cliente_nombre),'UTF-8') !== mb_strtolower(trim((string)$cur['creador_nombre']),'UTF-8')) {
+    $tmp_id = create_marked_invited_user($conn, $cliente_nombre);
+    if ($tmp_id > 0) $creador_id_nuevo = $tmp_id;
+  }
+
+  $conn->begin_transaction();
+  try {
+    $up=$conn->prepare("UPDATE reservas SET cancha_id=?, fecha=?, hora_inicio=?, hora_fin=?, precio_total=?, tipo_reserva=?, creador_id=? WHERE reserva_id=?");
+    $up->bind_param("isssdsii",$cancha_id,$fecha,$hora_inicio,$hora_fin,$precio_final,$tipo_reserva,$creador_id_nuevo,$reserva_id);
+    if(!$up->execute()){ $up->close(); throw new Exception('No se pudo actualizar la reserva.'); }
+    $up->close();
+
+    // último pago
+    $sel=$conn->prepare("SELECT pago_id, estado FROM pagos WHERE reserva_id=? ORDER BY pago_id DESC LIMIT 1");
+    $sel->bind_param("i",$reserva_id); $sel->execute(); $p=$sel->get_result()->fetch_assoc(); $sel->close();
+
+    if($p){
+      $pid = (int)$p['pago_id'];
+      if($p['estado']==='pendiente'){
+        $upd=$conn->prepare("UPDATE pagos SET metodo=?, monto=?, jugador_id=? WHERE pago_id=?");
+        $upd->bind_param("sdii",$metodo,$precio_final,$creador_id_nuevo,$pid); $upd->execute(); $upd->close();
+      }
+    }
+
+    // Notificaciones edición (al nuevo titular)
+    $tipo='reserva_editada'; $origen='recepcion';
+    $titulo="Reserva editada #{$reserva_id}";
+    $mensaje="Nueva fecha/horario: {$fecha} {$hora_inicio}-{$hora_fin}.";
+
+    $stA=$conn->prepare("INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje)
+                         SELECT user_id, ?, ?, ?, ? FROM usuarios WHERE rol='admin'");
+    $stA->bind_param("ssss",$tipo,$origen,$titulo,$mensaje); $stA->execute(); $stA->close();
+
+    $stP=$conn->prepare("INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje) VALUES (?,?,?,?,?)");
+    $stP->bind_param("issss",$proveedor_id,$tipo,$origen,$titulo,$mensaje); $stP->execute(); $stP->close();
+
+    $cl_uid = $creador_id_nuevo;
+    $msgCliente = "Su reserva fue actualizada: {$mensaje}";
+    $stC=$conn->prepare("INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje) VALUES (?,?,?,?,?)");
+    $stC->bind_param("issss",$cl_uid,$tipo,$origen,$titulo,$msgCliente); $stC->execute(); $stC->close();
+
+    $conn->commit();
+    redirect_ok("Reserva #{$reserva_id} actualizada.");
+  } catch(Throwable $e){
+    $conn->rollback();
+    redirect_err($e->getMessage());
+  }
+}
+
+/* fallback */
 redirect_err('Acción inválida.');

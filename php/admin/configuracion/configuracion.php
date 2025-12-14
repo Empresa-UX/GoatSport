@@ -40,9 +40,9 @@ $result = $stmt->get_result();
 $admin = $result->fetch_assoc();
 $stmt->close();
 
-$nombre = htmlspecialchars($admin['nombre']);
-$email = htmlspecialchars($admin['email']);
-$fecha_registro = $admin['fecha_registro'];
+$nombre = htmlspecialchars($admin['nombre'] ?? '');
+$email = htmlspecialchars($admin['email'] ?? '');
+$fecha_registro = $admin['fecha_registro'] ?? date('Y-m-d H:i:s');
 ?>
 
 <div class="section">
@@ -90,15 +90,11 @@ $fecha_registro = $admin['fecha_registro'];
             <label>Email:</label>
             <input type="email" name="email" value="<?= $email ?>" required>
 
-            <label>Contraseña:</label>
-            <input type="password" value="********" disabled>
-            <small style="display:block; margin-bottom:15px; color:#777;">
-                La contraseña se gestiona desde la pantalla de login / recuperación.
-            </small>
-
-            <button type="submit" class="btn-add" style="margin-top:10px;">
-                Guardar cambios
-            </button>
+            <!-- Botones de acción -->
+            <div style="display:flex; gap:10px; align-items:center; margin-top:16px;">
+                <button type="submit" class="btn-add">Guardar cambios</button>
+                <button type="button" class="btn-add" onclick="history.back()">Cancelar</button>
+            </div>
         </form>
     </div>
 </div>

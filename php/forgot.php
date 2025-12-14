@@ -56,7 +56,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $mail->Port = 587;
 
             $mail->setFrom('goatsportsoporte2025@gmail.com', 'Goat Sport Soporte');
-            $mail->addAddress($email);
+            $mail->addAddress(address: $email);
 
             $mail->isHTML(true);
             $mail->Subject = 'Recuperación de contraseña';
@@ -64,7 +64,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div style='font-family: Arial, sans-serif; background-color: #e0f2f1; padding: 40px;'>
                 <div style='max-width: 600px; margin: auto; background: #ffffff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 30px; text-align: center;'>
                     <!-- Logo -->
-                    <img src='https://i.postimg.cc/TY6VnmZq/goatsport.jpg' alt='GoatSport' style='width: 180px; margin-bottom: 20px;'>
+                    <img src='https://i.postimg.cc/tChXrCQX/goatsport.jpg' alt='GoatSport' style='width: 180px; margin-bottom: 20px;'>
 
                     <!-- Título -->
                     <h1 style='color: #054a56; font-size: 28px; margin-bottom: 20px;'>Recuperación de Contraseña</h1>
