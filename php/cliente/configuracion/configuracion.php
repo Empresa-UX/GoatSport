@@ -54,7 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $estilo_arr   = $_POST['estilo_juego']     ?? [];
     $freq         = $_POST['frecuencia_juego'] ?? null;
-    $dias_arr     = $_POST['dias_disponibles'] ?? [];
     $pala_m_arr   = $_POST['pala_marca']       ?? [];
     $pala_mod_arr = $_POST['pala_modelo']      ?? [];
     $horario      = $_POST['horario_pref']     ?? null;
@@ -73,10 +72,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $valid_estilo = ['ofensivo','defensivo','regular','globero','voleador','counter'];
     $estilo_fil = array_values(array_intersect($estilo_arr, $valid_estilo));
     $estilo_str = $estilo_fil ? implode(',', $estilo_fil) : null;
-
-    $valid_dias = ['1','2','3','4','5','6','7'];
-    $dias_fil = array_values(array_intersect($dias_arr, $valid_dias));
-    $dias_str = $dias_fil ? implode(',', $dias_fil) : null;
 
     $catalogo_marcas  = ['Bullpadel','Nox','Head','Babolat','Siux','StarVie'];
     $catalogo_modelos = ['Vertex 04','Hack 03','AT10 Genius','Delta Pro','Air Viper','Astrum Eris'];
@@ -104,7 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $param_pala_m     = $pala_m_str;
     $param_pala_mod   = $pala_mod_str;
     $param_freq       = $freq;
-    $param_dias       = $dias_str;
     $param_horario    = $horario;
     $param_pref_cto   = $pref_cto;
 
@@ -113,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       INSERT INTO cliente_detalle
         (cliente_id, telefono, fecha_nacimiento, ciudad, barrio, bio,
          genero, mano_habil, nivel_padel, posicion_pref, estilo_juego,
-         pala_marca, pala_modelo, frecuencia_juego, dias_disponibles, horario_pref, prefer_contacto)
+         pala_marca, pala_modelo, frecuencia_juego, horario_pref, prefer_contacto)
       VALUES (?, ?, ?, ?, ?, ?,
               ?, ?, ?, ?, ?,
               ?, ?, ?, ?, ?, ?)
@@ -131,7 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         pala_marca=VALUES(pala_marca),
         pala_modelo=VALUES(pala_modelo),
         frecuencia_juego=VALUES(frecuencia_juego),
-        dias_disponibles=VALUES(dias_disponibles),
         horario_pref=VALUES(horario_pref),
         prefer_contacto=VALUES(prefer_contacto)
     ";
@@ -139,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $st = $conn->prepare($sql);
 
     // ***** FIX: tipos SIN espacios y con 17 letras (1 i + 7 s + 1 i + 8 s) *****
-    $types = "isssssssissssssss";
+    $types = "isssssssisssssss";
 
     $st->bind_param(
         $types,
@@ -157,7 +150,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $param_pala_m,
         $param_pala_mod,
         $param_freq,
-        $param_dias,
         $param_horario,
         $param_pref_cto
     );
@@ -175,14 +167,14 @@ $det = [
   'telefono'=> '', 'fecha_nacimiento'=> '', 'ciudad'=> '', 'barrio'=>'', 'bio'=> '',
   'genero'=> null,
   'mano_habil'=> null, 'nivel_padel'=> null, 'posicion_pref'=> null, 'estilo_juego'=> [],
-  'pala_marca'=> [], 'pala_modelo'=> [], 'frecuencia_juego'=> null, 'dias_disponibles'=> [], 'horario_pref'=> null,
+  'pala_marca'=> [], 'pala_modelo'=> [], 'frecuencia_juego'=> null, 'horario_pref'=> null,
   'prefer_contacto'=> null
 ];
 
 $st = $conn->prepare("
   SELECT telefono, fecha_nacimiento, ciudad, barrio, bio,
          genero, mano_habil, nivel_padel, posicion_pref, estilo_juego,
-         pala_marca, pala_modelo, frecuencia_juego, dias_disponibles, horario_pref, prefer_contacto
+         pala_marca, pala_modelo, frecuencia_juego, horario_pref, prefer_contacto
   FROM cliente_detalle WHERE cliente_id=? LIMIT 1
 ");
 $st->bind_param("i", $userId);
@@ -202,7 +194,6 @@ if ($row = $st->get_result()->fetch_assoc()) {
   $det['pala_marca']        = !empty($row['pala_marca']) ? explode(',', $row['pala_marca']) : [];
   $det['pala_modelo']       = !empty($row['pala_modelo']) ? explode(',', $row['pala_modelo']) : [];
   $det['frecuencia_juego']  = $row['frecuencia_juego'];
-  $det['dias_disponibles']  = !empty($row['dias_disponibles']) ? explode(',', $row['dias_disponibles']) : [];
   $det['horario_pref']      = $row['horario_pref'];
   $det['prefer_contacto']   = $row['prefer_contacto'] ?? null;
 }
@@ -431,18 +422,6 @@ legend{ padding:0 8px; font-weight:700; color:#043b3d; }
           </div>
 
           <div class="full">
-            <fieldset>
-              <legend>Días disponibles</legend>
-              <div class="check-group">
-                <?php
-                  $dias = ['1'=>'Lun','2'=>'Mar','3'=>'Mié','4'=>'Jue','5'=>'Vie','6'=>'Sáb','7'=>'Dom'];
-                  foreach ($dias as $k=>$lab):
-                    $chk = in_array($k, $det['dias_disponibles'], true) ? 'checked' : '';
-                ?>
-                  <label><input type="checkbox" name="dias_disponibles[]" value="<?= $k ?>" <?= $chk ?>> <?= $lab ?></label>
-                <?php endforeach; ?>
-              </div>
-            </fieldset>
           </div>
         </div>
       </div>
