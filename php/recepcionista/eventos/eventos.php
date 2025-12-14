@@ -1,6 +1,6 @@
 <?php
 /* =========================================================================
- * file: php/recepcionista/eventos/index.php   (AJUSTADO A TU BD)
+ * file: php/recepcionista/eventos/eventos.php   (REEMPLAZO COMPLETO)
  * ========================================================================= */
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
@@ -8,22 +8,28 @@ include __DIR__ . '/../includes/cards.php';
 include __DIR__ . '/../../config.php';
 
 $proveedor_id = (int)($_SESSION['proveedor_id'] ?? 0);
-if ($proveedor_id <= 0) { echo "<main><div class='section'><p>Sesión inválida.</p></div></main>"; include __DIR__ . '/../includes/footer.php'; exit; }
+if ($proveedor_id <= 0) {
+  echo "<main><div class='section'><p>Sesión inválida.</p></div></main>";
+  include __DIR__ . '/../includes/footer.php'; exit;
+}
 
 /* Canchas del proveedor (para filtros) */
 $sqlC = "SELECT cancha_id, nombre FROM canchas WHERE proveedor_id=? AND activa=1 ORDER BY nombre";
-$stmt = $conn->prepare($sqlC); $stmt->bind_param("i",$proveedor_id); $stmt->execute();
-$canchas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+$stmt = $conn->prepare($sqlC);
+$stmt->bind_param("i",$proveedor_id);
+$stmt->execute();
+$canchas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 
 /* Filtros */
-$hoy = date('Y-m-d');
+$hoy       = date('Y-m-d');
 $cancha_id = (int)($_GET['cancha_id'] ?? 0);
 $desde     = $_GET['desde'] ?? $hoy;
 $hasta     = $_GET['hasta'] ?? date('Y-m-d', strtotime($hoy.' +14 days'));
-$tipo      = $_GET['tipo']  ?? 'todos'; // bloqueo|torneo|otro|todos
-$estado    = $_GET['estado']?? 'vigentes'; // vigentes|futuros|pasados|todos
+$tipo      = $_GET['tipo']  ?? 'todos';     // bloqueo|torneo|otro|todos
+$estado    = $_GET['estado']?? 'vigentes';  // vigentes|futuros|pasados|todos
 
-/* Query eventos (NO promociones aquí) */
+/* Query eventos (excluye tipo 'promocion' para esta vista) */
 $sql = "
   SELECT e.evento_id, e.titulo, e.descripcion, e.fecha_inicio, e.fecha_fin, e.tipo,
          e.color, e.cancha_id, c.nombre AS cancha_nombre
@@ -34,23 +40,34 @@ $sql = "
     AND DATE(e.fecha_inicio)<= ?
     AND e.tipo <> 'promocion'
 ";
-$params = [$proveedor_id, $desde, $hasta]; $types = "iss";
+$params = [$proveedor_id, $desde, $hasta];
+$types  = "iss";
 
-if ($cancha_id > 0) { $sql .= " AND e.cancha_id = ?"; $params[] = $cancha_id; $types .= "i"; }
-if ($tipo !== 'todos') { $sql .= " AND e.tipo = ?"; $params[] = $tipo; $types .= "s"; }
-
+if ($cancha_id > 0) {
+  $sql .= " AND e.cancha_id = ?";
+  $params[] = $cancha_id; $types .= "i";
+}
+if ($tipo !== 'todos') {
+  $sql .= " AND e.tipo = ?";
+  $params[] = $tipo; $types .= "s";
+}
 $sql .= " ORDER BY e.fecha_inicio ASC, e.fecha_fin ASC";
+
 $stmt = $conn->prepare($sql);
 $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-/* Estado por fechas (día) */
+/* Helpers */
+function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+function ddmmyyyy(?string $d): string { if(!$d) return '—'; $t=strtotime($d); return $t?date('d/m/Y',$t):'—'; }
+function hhmm(?string $t): string { return $t ? substr($t,0,5) : '—'; }
 function estadoEventoFila(array $e, string $hoy): string {
-  $ini = substr($e['fecha_inicio'],0,10); $fin = substr($e['fecha_fin'],0,10);
+  $ini = substr($e['fecha_inicio'],0,10);
+  $fin = substr($e['fecha_fin'],0,10);
   if ($ini <= $hoy && $hoy < $fin) return 'Vigente hoy';
-  if ($ini >  $hoy) return 'Próximo';
+  if ($ini >  $hoy)               return 'Próximo';
   return 'Finalizado';
 }
 ?>
@@ -59,18 +76,54 @@ function estadoEventoFila(array $e, string $hoy): string {
     <div class="section-header"><h2>Eventos especiales</h2></div>
 
     <style>
-      .fbar{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;background:#fff;padding:14px 16px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.08);margin-bottom:16px}
-      .f{display:flex;flex-direction:column;gap:6px;min-width:200px}
-      .f label{font-size:12px;color:#586168;font-weight:700}
-      .f select,.f input[type="date"]{padding:10px 12px;border:1px solid #d6dadd;border-radius:10px;background:#fff;outline:none}
-      .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;white-space:nowrap;border:1px solid transparent}
-      .p-ok{background:#e6f7f4;border-color:#c8efe8;color:#0f766e}
-      .p-pend{background:#fff7e6;border-color:#ffe1b5;color:#995c00}
-      .p-bad{background:#fde8e8;border-color:#f8c9c9;color:#7f1d1d}
-      table tr td:nth-child(2){min-width:170px}
-      table tr td:nth-child(3){min-width:210px}
-      table tr td:nth-child(4){min-width:110px}
-      table tr td:nth-child(5){min-width:120px}
+      /* ===== anchos manipulables ===== */
+      :root{
+        --col-titulo:   220px;
+        --col-desc:     400px;
+        --col-fini:     90px;
+        --col-ffin:     90px;
+        --col-hini:     90px;
+        --col-hfin:     90px;
+        --col-tipo:     70px;
+        --col-estado:   100px;
+      }
+
+      /* Filtros */
+      .fbar{
+        display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;
+        background:#fff; padding:14px 16px; border-radius:12px;
+        box-shadow:0 4px 12px rgba(0,0,0,.08); margin-bottom:16px
+      }
+      .f{display:flex; flex-direction:column; gap:6px; min-width:190px}
+      .f label{font-size:12px; color:#586168; font-weight:700}
+      .f select,.f input[type="date"]{
+        padding:10px 12px; border:1px solid #d6dadd; border-radius:10px; background:#fff; outline:none
+      }
+
+      /* Tabla estilo reportes */
+      table{ width:100%; border-collapse:separate; border-spacing:0; background:#fff; border-radius:12px; overflow:hidden; table-layout:fixed; }
+      thead th{ position:sticky; top:0; background:#f8fafc; z-index:1; text-align:left; font-weight:700; padding:10px 12px; font-size:13px; color:#334155; border-bottom:1px solid #e5e7eb; }
+      tbody td{ padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+      tbody tr:hover{ background:#f7fbfd; }
+
+      th.col-titulo, td.col-titulo   { width:var(--col-titulo); }
+      th.col-desc,   td.col-desc     { width:var(--col-desc); }
+      th.col-fini,   td.col-fini     { width:var(--col-fini);  text-wrap:nowrap; }
+      th.col-ffin,   td.col-ffin     { width:var(--col-ffin);  text-wrap:nowrap; }
+      th.col-hini,   td.col-hini     { width:var(--col-hini);  text-wrap:nowrap; }
+      th.col-hfin,   td.col-hfin     { width:var(--col-hfin);  text-wrap:nowrap; }
+      th.col-tipo,   td.col-tipo     { width:var(--col-tipo);  }
+      th.col-estado, td.col-estado   { width:var(--col-estado); text-align:center; }
+
+      /* Título y Descripción (como reportes) */
+      .title-text{ white-space:normal; word-wrap:break-word; font-size:14px; color:#0f172a; }
+      .desc-text { white-space:normal; word-wrap:break-word; font-size:12px; color:#64748b; }
+
+      /* Pills */
+      .pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; white-space:nowrap; border:1px solid transparent }
+      .p-ok{   background:#e6f7f4; border-color:#c8efe8; color:#0f766e; }
+      .p-warn{ background:#fff7e6; border-color:#ffe1b5; color:#92400e; }
+      .p-bad{  background:#fde8e8; border-color:#f8c9c9; color:#7f1d1d; }
     </style>
 
     <form class="fbar" method="GET" id="fEventos">
@@ -79,19 +132,19 @@ function estadoEventoFila(array $e, string $hoy): string {
         <select name="cancha_id" onchange="this.form.submit()">
           <option value="0" <?= $cancha_id===0?'selected':'' ?>>Todas</option>
           <?php foreach($canchas as $c): ?>
-            <option value="<?= (int)$c['cancha_id'] ?>" <?= $c['cancha_id']===$cancha_id?'selected':'' ?>>
-              <?= htmlspecialchars($c['nombre']) ?>
+            <option value="<?= (int)$c['cancha_id'] ?>" <?= (int)$c['cancha_id']===$cancha_id?'selected':'' ?>>
+              <?= h($c['nombre']) ?>
             </option>
           <?php endforeach; ?>
         </select>
       </div>
       <div class="f">
         <label>Desde</label>
-        <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>" onchange="this.form.submit()">
+        <input type="date" name="desde" value="<?= h($desde) ?>" onchange="this.form.submit()">
       </div>
       <div class="f">
         <label>Hasta</label>
-        <input type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>" onchange="this.form.submit()">
+        <input type="date" name="hasta" value="<?= h($hasta) ?>" onchange="this.form.submit()">
       </div>
       <div class="f">
         <label>Tipo</label>
@@ -112,38 +165,66 @@ function estadoEventoFila(array $e, string $hoy): string {
     </form>
 
     <table>
-      <tr>
-        <th>Título</th>
-        <th>Cancha</th>
-        <th>Inicio — Fin</th>
-        <th>Tipo</th>
-        <th>Estado</th>
-      </tr>
-      <?php
-      $count=0;
-      foreach ($rows as $e):
-        $estadoTxt = estadoEventoFila($e, $hoy);
-        if ($estado==='vigentes' && $estadoTxt!=='Vigente hoy') continue;
-        if ($estado==='futuros'  && $estadoTxt!=='Próximo') continue;
-        if ($estado==='pasados'  && $estadoTxt!=='Finalizado') continue;
-
-        $count++;
-        $ini = date('d/m/Y H:i', strtotime($e['fecha_inicio']));
-        $fin = date('d/m/Y H:i', strtotime($e['fecha_fin']));
-        $pillType = ['bloqueo'=>'p-bad','torneo'=>'p-pend','otro'=>'p-pend'][$e['tipo']] ?? 'p-pend';
-        $pillEstado = ['Vigente hoy'=>'p-ok','Próximo'=>'p-pend','Finalizado'=>'p-bad'][$estadoTxt] ?? 'p-pend';
-      ?>
+      <thead>
         <tr>
-          <td><?= htmlspecialchars($e['titulo']) ?></td>
-          <td><?= htmlspecialchars($e['cancha_nombre'] ?? '-') ?></td>
-          <td><?= $ini ?> — <?= $fin ?></td>
-          <td><span class="pill <?= $pillType ?>"><?= htmlspecialchars(ucfirst($e['tipo'])) ?></span></td>
-          <td><span class="pill <?= $pillEstado ?>"><?= $estadoTxt ?></span></td>
+          <th class="col-titulo">Título</th>
+          <th class="col-desc">Descripción</th>
+          <th class="col-fini">Fecha inicio</th>
+          <th class="col-ffin">Fecha fin</th>
+          <th class="col-hini">Hora inicio</th>
+          <th class="col-hfin">Hora fin</th>
+          <th class="col-tipo">Tipo</th>
+          <th class="col-estado">Estado</th>
         </tr>
-      <?php endforeach; if ($count===0): ?>
-        <tr><td colspan="5" style="text-align:center;">Sin eventos con esos filtros.</td></tr>
-      <?php endif; ?>
+      </thead>
+      <tbody>
+        <?php
+        $count = 0;
+        foreach ($rows as $e):
+          $estadoTxt = estadoEventoFila($e, $hoy);
+          if ($estado==='vigentes' && $estadoTxt!=='Vigente hoy') continue;
+          if ($estado==='futuros'  && $estadoTxt!=='Próximo')     continue;
+          if ($estado==='pasados'  && $estadoTxt!=='Finalizado')  continue;
+
+          $count++;
+          $iniDT = strtotime($e['fecha_inicio']);
+          $finDT = strtotime($e['fecha_fin']);
+
+          $fIni = ddmmyyyy($e['fecha_inicio']);
+          $fFin = ddmmyyyy($e['fecha_fin']);
+          $hIni = $iniDT ? date('H:i', $iniDT) : '—';
+          $hFin = $finDT ? date('H:i', $finDT) : '—';
+
+          $pillTipo   = ($e['tipo']==='bloqueo') ? 'p-bad' : 'p-warn';
+          $pillEstado = ['Vigente hoy'=>'p-ok','Próximo'=>'p-warn','Finalizado'=>'p-bad'][$estadoTxt] ?? 'p-warn';
+        ?>
+          <tr>
+            <td class="col-titulo">
+              <div class="title-text"><strong><?= h($e['titulo']) ?></strong></div>
+              <?php if (!empty($e['cancha_nombre'])): ?>
+                <div class="desc-text">Cancha: <?= h($e['cancha_nombre']) ?></div>
+              <?php endif; ?>
+            </td>
+            <td class="col-desc">
+              <?php if (!empty($e['descripcion'])): ?>
+                <div class="desc-text"><?= nl2br(h($e['descripcion'])) ?></div>
+              <?php else: ?>
+                <span class="desc-text" style="opacity:.7">—</span>
+              <?php endif; ?>
+            </td>
+            <td class="col-fini"><?= h($fIni) ?></td>
+            <td class="col-ffin"><?= h($fFin) ?></td>
+            <td class="col-hini"><?= h($hIni) ?></td>
+            <td class="col-hfin"><?= h($hFin) ?></td>
+            <td class="col-tipo"><span class="pill <?= $pillTipo ?>"><?= h(ucfirst($e['tipo'])) ?></span></td>
+            <td class="col-estado"><span class="pill <?= $pillEstado ?>"><?= h($estadoTxt) ?></span></td>
+          </tr>
+        <?php endforeach; if ($count===0): ?>
+          <tr><td colspan="8" style="text-align:center;">Sin eventos con esos filtros.</td></tr>
+        <?php endif; ?>
+      </tbody>
     </table>
   </div>
 </main>
+
 <?php include __DIR__ . '/../includes/footer.php'; ?>

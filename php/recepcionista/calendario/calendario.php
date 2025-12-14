@@ -4,7 +4,13 @@
  * ========================================================================= */
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
+include './../includes/cards.php';
 include __DIR__ . '/../../config.php';
+
+/* Zona horaria local */
+if (function_exists('date_default_timezone_set')) {
+  @date_default_timezone_set('America/Argentina/Buenos_Aires');
+}
 
 $proveedor_id = (int)($_SESSION['proveedor_id'] ?? 0);
 if ($proveedor_id <= 0) {
@@ -25,12 +31,16 @@ if (empty($canchas)) {
   include __DIR__ . '/../includes/footer.php'; exit;
 }
 
-/* 2) Filtros */
-$fecha       = $_GET['fecha']      ?? date('Y-m-d');
+/* 2) Filtros + clamp de fecha pasada */
+$today       = date('Y-m-d');
+$fecha_in    = $_GET['fecha'] ?? $today;
+$fecha_norm  = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_in) ? $fecha_in : $today;
+$fecha       = ($fecha_norm < $today) ? $today : $fecha_norm;
+
 $cancha_id   = (int)($_GET['cancha_id'] ?? $canchas[0]['cancha_id']);
-$estado_f    = $_GET['estado']     ?? 'todos';       // todos | reservas | eventos | torneos
-$desde_f     = $_GET['desde']      ?? '';            // HH:MM
-$hasta_f     = $_GET['hasta']      ?? '';            // HH:MM
+$estado_f    = $_GET['estado']     ?? 'todos';
+$desde_f     = $_GET['desde']      ?? '';
+$hasta_f     = $_GET['hasta']      ?? '';
 
 /* 3) Cancha seleccionada */
 $sqlCancha = "SELECT nombre, hora_apertura, hora_cierre, duracion_turno FROM canchas WHERE cancha_id=? AND proveedor_id=? LIMIT 1";
@@ -45,7 +55,7 @@ if (!$cancha) {
   include __DIR__ . '/../includes/footer.php'; exit;
 }
 
-/* 4) Reservas del día (esa cancha) + último pago para color */
+/* 4) Reservas del día */
 $sqlReservas = "
   SELECT r.reserva_id, r.hora_inicio, r.hora_fin, r.estado, r.tipo_reserva,
          lp.estado AS estado_pago
@@ -70,7 +80,7 @@ $reservas = [];
 while ($r = $reservasDB->fetch_assoc()) { $reservas[] = $r; }
 $stmt->close();
 
-/* 5) Eventos que cruzan ese día/cancha */
+/* 5) Eventos del día */
 $sqlEventos = "
   SELECT evento_id, titulo, fecha_inicio, fecha_fin, tipo, color
   FROM eventos_especiales
@@ -90,16 +100,14 @@ $stmt->close();
 function str_to_min(string $hhmmss): int { $p = explode(':', $hhmmss); return (int)$p[0]*60 + (int)$p[1]; }
 function clip_range(int $v, int $lo, int $hi): int { return max($lo, min($hi, $v)); }
 
-/* Colores por defecto agradables si evento.color viene vacío */
 function default_event_color(string $tipo): string {
   return match ($tipo) {
-    'torneo'   => '#8b5cf6', // violeta
-    'bloqueo'  => '#ef4444', // rojo suave
-    'promocion'=> '#10b981', // verde
-    default    => '#0ea5e9', // celeste
+    'torneo'   => '#8b5cf6',
+    'bloqueo'  => '#ef4444',
+    'promocion'=> '#10b981',
+    default    => '#0ea5e9',
   };
 }
-/* HEX → rgba(alpha) para fondo suave */
 function hex2rgba(string $hex, float $alpha=0.12): string {
   $hex = ltrim($hex, '#');
   if (strlen($hex)===3) $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
@@ -109,11 +117,11 @@ function hex2rgba(string $hex, float $alpha=0.12): string {
   return "rgba($r,$g,$b,$alpha)";
 }
 
-/* 6) Rango horario base (apertura/cierre) */
+/* 6) Rango horario base */
 $apertura = $cancha['hora_apertura'] ?: '08:00:00';
 $finalDia = $cancha['hora_cierre']   ?: '23:00:00';
 $turnoDB  = max(15, (int)($cancha['duracion_turno'] ?: 60));
-$SNAP     = 10; // snap de selección a 10 minutos
+$SNAP     = 10;
 
 $desde_ok = preg_match('/^\d{2}:\d{2}$/', $desde_f) ? ($desde_f . ':00') : $apertura;
 $hasta_ok = preg_match('/^\d{2}:\d{2}$/', $hasta_f) ? ($hasta_f . ':00') : $finalDia;
@@ -124,23 +132,18 @@ $viewStart = max(str_to_min($desde_ok), $openMin);
 $viewEnd   = min(str_to_min($hasta_ok), $closeMin);
 $daySpan   = max(1, $viewEnd - $viewStart);
 
-/* === Bloques para vista Día === */
-/* Siempre incluimos todo; el “filtro” solo atenúa visualmente */
+/* === Bloques === */
 $blocks_res = [];
 foreach ($reservas as $r) {
   $ini = clip_range(str_to_min($r['hora_inicio']), $viewStart, $viewEnd);
   $fin = clip_range(str_to_min($r['hora_fin']),   $viewStart, $viewEnd);
   if ($fin <= $ini) continue;
 
-  // clase por estado de reserva + pago
   $estado = $r['estado'];
   $pay    = $r['estado_pago'] ?? null;
-  $cls = 'res-pend'; // pendiente
-  if ($estado === 'confirmada') {
-    if ($pay === 'pendiente') $cls = 'res-conf-pend'; else $cls = 'res-conf';
-  } elseif ($estado === 'cancelada' || $estado === 'no_show') {
-    $cls = 'res-cancel';
-  }
+  $cls = 'res-pend';
+  if ($estado === 'confirmada') $cls = ($pay === 'pendiente') ? 'res-conf-pend' : 'res-conf';
+  elseif ($estado === 'cancelada' || $estado === 'no_show') $cls = 'res-cancel';
 
   $blocks_res[] = [
     'type'   => 'reserva',
@@ -171,7 +174,7 @@ foreach ($eventos as $e) {
   $blocks_evt[] = [
     'type'   => 'evento',
     'id'     => (int)$e['evento_id'],
-    'raw'    => $e['tipo'],               // bloqueo | torneo | promocion | otro
+    'raw'    => $e['tipo'],
     'color'  => $color,
     'bg'     => hex2rgba($color, 0.12),
     'top'    => ($ini - $viewStart) / $daySpan * 100.0,
@@ -182,16 +185,36 @@ foreach ($eventos as $e) {
   ];
 }
 
-/* Rangos ocupados (para snap/“pared”): reservas pend/confirm + eventos bloqueo/torneo */
+/* Rangos ocupados (reserva pend/confirm + bloqueo/torneo) */
 $occupied = [];
 foreach ($blocks_res as $b) {
-  if ($b['estado']==='pendiente' || $b['estado']==='confirmada') {
-    $occupied[] = [$b['min_ini'], $b['min_fin']];
-  }
+  if ($b['estado']==='pendiente' || $b['estado']==='confirmada') $occupied[] = [$b['min_ini'], $b['min_fin']];
 }
 foreach ($blocks_evt as $b) {
-  if ($b['raw']==='bloqueo' || $b['raw']==='torneo') {
-    $occupied[] = [$b['min_ini'], $b['min_fin']];
+  if ($b['raw']==='bloqueo' || $b['raw']==='torneo') $occupied[] = [$b['min_ini'], $b['min_fin']];
+}
+
+/* === Pasado como “evento” oscuro: Horas muertas === */
+if ($fecha === $today) {
+  $nowMin = (int)date('G')*60 + (int)date('i');
+  $nowMinClamped = clip_range($nowMin, $viewStart, $viewEnd);
+  if ($nowMinClamped > $viewStart) {
+    $occupied[] = [$viewStart, $nowMinClamped]; /* bloqueo real de selección */
+    $dead_ini = $viewStart;
+    $dead_fin = $nowMinClamped;
+    $dead_color = '#111827'; /* slate-900 */
+    $blocks_evt[] = [
+      'type'   => 'evento',
+      'id'     => 0,
+      'raw'    => 'horas_muertas', /* no afecta las reglas actuales (solo “torneo” se atenúa en filtro Eventos) */
+      'color'  => $dead_color,
+      'bg'     => hex2rgba($dead_color, 0.14),
+      'top'    => ($dead_ini - $viewStart) / $daySpan * 100.0,
+      'height' => ($dead_fin - $dead_ini) / $daySpan * 100.0,
+      'label'  => 'Tiempo transcurrido',
+      'min_ini'=> $dead_ini,
+      'min_fin'=> $dead_fin,
+    ];
   }
 }
 
@@ -208,9 +231,8 @@ foreach ($blocks_evt as $b) {
       .f select,.f input[type="date"],.f input[type="time"]{padding:8px 10px;border:1px solid #d6dadd;border-radius:10px;background:#fff;outline:none;transition:border-color .2s,box-shadow .2s}
       .f select:focus,.f input[type="date"]:focus,.f input[type="time"]:focus{border-color:#1bab9d;box-shadow:0 0 0 3px rgba(27,171,157,.12)}
 
-      /* Vista Día */
       .day-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);display:grid;grid-template-columns:80px 1fr}
-      .day-wrap > *{ padding-top:50px; padding-bottom:30px; margin-top: 50px; margin-bottom: 50px;} /* por qué: evita que 07:00 quede detrás de filtros y alinea selección */
+      .day-wrap > *{ padding-top:50px; padding-bottom:30px; margin-top: 50px; margin-bottom: 50px;}
       .day-times{border-right:1px dashed #e5e7eb;position:relative;margin-bottom:30px}
       .day-grid{position:relative;padding-top:18px;padding-bottom:24px}
       .hr{position:absolute;left:0;right:0;height:1px;background:#eef2f7}
@@ -228,10 +250,9 @@ foreach ($blocks_evt as $b) {
       .blk a{color:inherit;text-decoration:none;display:block}
       .blk:hover{filter:brightness(.98)}
 
-      /* Atenuar no enfocados según filtro */
       .is-dim{opacity:.35; filter:grayscale(12%);}
 
-     /* Tooltip grande */ .tip{position:absolute;transform:translate(-50%, -120%);background:#009684ff;color:#fff;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:700;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px #009684ff}
+      .tip{position:absolute;transform:translate(-50%, -120%);background:#009684ff;color:#fff;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:700;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px #009684ff}
     </style>
 
     <!-- Filtros -->
@@ -248,7 +269,12 @@ foreach ($blocks_evt as $b) {
       </div>
       <div class="f">
         <label>Fecha</label>
-        <input type="date" name="fecha" value="<?= htmlspecialchars($fecha) ?>" onchange="this.form.submit()">
+        <input
+          type="date"
+          name="fecha"
+          value="<?= htmlspecialchars($fecha) ?>"
+          min="<?= htmlspecialchars($today) ?>"
+          onchange="this.form.submit()">
       </div>
       <div class="f">
         <label>Estado</label>
@@ -271,29 +297,22 @@ foreach ($blocks_evt as $b) {
     </form>
 
     <?php
-      // altura proporcional: 64px por hora del rango visible
       $hours = max(1, $daySpan / 60);
       $totalHeight = (int)round($hours * 64);
 
-      // líneas y labels cada hora exacta
       $labels = [];
       $t = $viewStart - ($viewStart % 60);
       for (; $t <= $viewEnd; $t += 60) $labels[] = $t;
 
-      // helper de atenuación según filtro elegido
       function dim_class_for($estado_f, $kind, $rawTipo=null) {
-        // $kind: 'reserva' | 'evento'
-        // $rawTipo (para eventos): torneo/bloqueo/promocion/otro
         if ($estado_f === 'todos') return '';
         if ($estado_f === 'reservas') return $kind==='reserva' ? '' : 'is-dim';
         if ($estado_f === 'eventos') {
           if ($kind==='reserva') return 'is-dim';
-          // evento: si es torneo, atenuar
           return ($rawTipo==='torneo') ? 'is-dim' : '';
         }
         if ($estado_f === 'torneos') {
           if ($kind==='reserva') return 'is-dim';
-          // evento: destacar torneos, atenuar el resto
           return ($rawTipo==='torneo') ? '' : 'is-dim';
         }
         return '';
@@ -311,7 +330,7 @@ foreach ($blocks_evt as $b) {
       </div>
       <div class="day-grid" id="dayGrid" style="height:<?= $totalHeight ?>px;">
 
-        <!-- Eventos -->
+        <!-- Eventos (incluye “Horas muertas”) -->
         <?php foreach ($blocks_evt as $b):
           $dimCls = dim_class_for($estado_f, 'evento', $b['raw']);
         ?>
@@ -321,7 +340,7 @@ foreach ($blocks_evt as $b) {
           </div>
         <?php endforeach; ?>
 
-        <!-- Reservas (CLICK → reservas.php con filtros + focus) -->
+        <!-- Reservas -->
         <?php foreach ($blocks_res as $b):
           $href = '../reservas/reservas.php?fecha='.urlencode($fecha)
                 . '&cancha_id='.(int)$cancha_id
@@ -339,7 +358,7 @@ foreach ($blocks_evt as $b) {
           </div>
         <?php endforeach; ?>
 
-        <!-- Capa de selección drag para crear reserva -->
+        <!-- Capa de selección -->
         <div class="click-layer" data-start="<?= $viewStart ?>" data-span="<?= $daySpan ?>"></div>
       </div>
     </div>
@@ -415,7 +434,7 @@ foreach ($blocks_evt as $b) {
         layer.addEventListener('mousedown', (e)=>{
           if (e.button===2) return;
           const mStart = yToMin(e.clientY);
-          if (insideAny(mStart)){ e.preventDefault(); return; }
+          if (insideAny(mStart)){ e.preventDefault(); return; } // ocupado o “Horas muertas”
           dragging = true;
           ensureDraft();
           m0 = mStart;
@@ -439,7 +458,7 @@ foreach ($blocks_evt as $b) {
           if (fin <= ini) fin = ini + snap;
           if (intersectsAny(ini, fin)){
             clearDraft();
-            alert('El rango seleccionado se superpone con una reserva o evento.');
+            alert('El rango seleccionado se superpone con una reserva/evento o pertenece al pasado.');
             return;
           }
           const url = new URL('<?= dirname($_SERVER['REQUEST_URI']) ?>/../reservas/reservasForm.php', window.location.href);
@@ -452,17 +471,15 @@ foreach ($blocks_evt as $b) {
         });
 
         window.addEventListener('keydown', (e) => {
-              // por qué: permite salir rápido sin usar click derecho
-              if (e.key === 'Escape' || e.key === 'Esc') {
-                if (dragging || draft) {
-                  dragging = false;
-                  clearDraft();
-                  e.preventDefault();
-                  e.stopPropagation();
-                }
-              }
-            });
-
+          if (e.key === 'Escape' || e.key === 'Esc') {
+            if (dragging || draft) {
+              dragging = false;
+              clearDraft();
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }
+        });
       })();
     </script>
   </div>

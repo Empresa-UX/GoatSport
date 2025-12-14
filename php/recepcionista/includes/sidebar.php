@@ -13,9 +13,9 @@
   <a href="/php/recepcionista/reservas/reservas.php">Reservas</a>
   <a href="/php/recepcionista/clientes/clientes.php">Registrar cliente</a>
   <a href="/php/recepcionista/partidos/partidos.php">Registrar resultado</a>
-  <a href="/php/recepcionista/notificaciones/notificaciones.php">Notificaciones</a>
   <a href="/php/recepcionista/eventos/eventos.php">Eventos especiales</a>
   <a href="/php/recepcionista/promociones/promociones.php">Promociones</a>
+  <a href="/php/recepcionista/notificaciones/notificaciones.php">Notificaciones</a>
 
   <a href="/php/logout.php">Cerrar sesión</a>
 </aside>

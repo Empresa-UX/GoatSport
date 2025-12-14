@@ -98,52 +98,47 @@ $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 /* ====== Helpers ====== */
+function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function estadoPromoFecha(array $p, string $hoy): string
 {
   $ini = $p['fecha_inicio'];
   $fin = $p['fecha_fin'];
-  if ($ini <= $hoy && $hoy <= $fin)
-    return 'Activa';
-  if ($ini > $hoy)
-    return 'Próxima';
+  if ($ini <= $hoy && $hoy <= $fin) return 'Activa';
+  if ($ini > $hoy) return 'Próxima';
   return 'Finalizada';
 }
-function diaNumeroISO(string $dateYmd): int
-{
-  return (int) date('N', strtotime($dateYmd));
-} // 1..7
+function ddmm(?string $d): string {
+  if(!$d) return '—';
+  $t = strtotime($d);
+  return $t ? date('d/m/y', $t) : '—';
+}
+function hhmm(?string $t): string { return $t ? substr($t,0,5) : 'Sin límite'; }
+function diaNumeroISO(string $dateYmd): int { return (int) date('N', strtotime($dateYmd)); } // 1..7
 function diasSetIncluye(?string $set, int $dia): bool
 {
-  if (!$set || $set === '')
-    return true; // null o vacío = todos
+  if (!$set || $set === '') return true; // null o vacío = todos
   $arr = array_map('trim', explode(',', $set));
   return in_array((string) $dia, $arr, true);
 }
 function diasLindos(?string $set): string
 {
-  if (!$set || $set === '')
-    return 'Todos';
-  $map = ['1' => 'Lun', '2' => 'Mar', '3' => 'Mié', '4' => 'Jue', '5' => 'Vie', '6' => 'Sáb', '7' => 'Dom'];
+  if (!$set || $set === '') return 'Todos los días';
+  $map = ['1' => 'L', '2' => 'Ma', '3' => 'Mi', '4' => 'J', '5' => 'V', '6' => 'S', '7' => 'D'];
   $arr = array_map('trim', explode(',', $set));
   $labs = array_map(fn($d) => $map[$d] ?? $d, $arr);
   return implode(', ', $labs);
 }
 function horaDentro(?string $hIni, ?string $hFin, string $hora): bool
 {
-  if (!$hIni && !$hFin)
-    return true;
-  if ($hIni && !$hFin)
-    return ($hora >= $hIni);
-  if (!$hIni && $hFin)
-    return ($hora < $hFin);
+  if (!$hIni && !$hFin) return true;
+  if ($hIni && !$hFin)  return ($hora >= $hIni);
+  if (!$hIni && $hFin)  return ($hora < $hFin);
   return ($hora >= $hIni && $hora < $hFin);
 }
 function aplicaHoyRow(array $p, string $hoy, string $now): bool
 {
-  if (!($p['fecha_inicio'] <= $hoy && $hoy <= $p['fecha_fin']))
-    return false;
-  if (!diasSetIncluye($p['dias_semana'] ?? null, diaNumeroISO($hoy)))
-    return false;
+  if (!($p['fecha_inicio'] <= $hoy && $hoy <= $p['fecha_fin'])) return false;
+  if (!diasSetIncluye($p['dias_semana'] ?? null, diaNumeroISO($hoy))) return false;
   return horaDentro($p['hora_inicio'] ?? null, $p['hora_fin'] ?? null, $now);
 }
 ?>
@@ -154,24 +149,30 @@ function aplicaHoyRow(array $p, string $hoy, string $now): bool
     </div>
 
     <style>
-      /* ---- Filtros en UNA LÍNEA (desktop) ---- */
+      /* ===== anchos manipulables ===== */
+      :root{
+        --col-nombre:    300px;
+        --col-canchas:   160px;
+        --col-fini:      90px;
+        --col-ffin:      90px;
+        --col-hini:      80px;
+        --col-hfin:      80px;
+        --col-dias:      140px;
+        --col-desc:      80px;
+        --col-estado:    100px;
+      }
+
+      /* ---- Filtros en UNA LÍNEA (tu base) ---- */
       .fbar {
         display: grid;
         grid-template-columns:
-          minmax(220px, 320px)
-          /* Buscar (más corto que antes) */
-          minmax(180px, 180px)
-          /* Cancha */
-          minmax(160px, 200px)
-          /* Desde */
-          minmax(160px, 200px)
-          /* Hasta */
-          minmax(70px, 140px)
-          /* % mín (tiny) */
-          minmax(70px, 140px)
-          /* % máx (tiny) */
-          minmax(140px, 180px);
-        /* Estado (tiny) */
+          minmax(220px, 320px)  /* Buscar */
+          minmax(180px, 180px)  /* Cancha */
+          minmax(160px, 200px)  /* Desde */
+          minmax(160px, 200px)  /* Hasta */
+          minmax(70px, 140px)   /* % mín */
+          minmax(70px, 140px)   /* % máx */
+          minmax(140px, 180px); /* Estado */
         gap: 12px;
         align-items: end;
         background: #fff;
@@ -180,134 +181,53 @@ function aplicaHoyRow(array $p, string $hoy, string $now): bool
         box-shadow: 0 4px 12px rgba(0, 0, 0, .08);
         margin-bottom: 12px;
       }
+      @media (max-width: 1150px) { .fbar { grid-template-columns: repeat(3, minmax(200px, 1fr)); } }
+      @media (max-width: 720px)  { .fbar { grid-template-columns: repeat(2, minmax(180px, 1fr)); } }
 
-      @media (max-width: 1150px) {
-        .fbar {
-          grid-template-columns: repeat(3, minmax(200px, 1fr));
-        }
+      .f { display:flex; flex-direction:column; gap:6px }
+      .f label{ font-size:12px; color:#586168; font-weight:700 }
+      .f select, .f input[type="date"], .f input[type="text"], .f input[type="number"]{
+        padding: 8px 10px; border:1px solid #d6dadd; border-radius:10px; background:#fff; outline:none;
       }
+      .f.tiny input, .f.tiny select { padding:7px 8px; }
+      .f.search{ max-width:320px }
 
-      @media (max-width: 720px) {
-        .fbar {
-          grid-template-columns: repeat(2, minmax(180px, 1fr));
-        }
-      }
+      .summary{ margin:8px 2px 12px; color:#475569; font-size:13px }
 
-      .f {
-        display: flex;
-        flex-direction: column;
-        gap: 6px
-      }
+      /* ---- Tabla estilo reportes ---- */
+      table{ width:100%; border-collapse:separate; border-spacing:0; background:#fff; border-radius:12px; overflow:hidden; table-layout:fixed; }
+      thead th{ position:sticky; top:0; background:#f8fafc; z-index:1; text-align:left; font-weight:700; padding:10px 12px; font-size:13px; color:#334155; border-bottom:1px solid #e5e7eb; }
+      tbody td{ padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+      tbody tr:hover{ background:#f7fbfd; }
 
-      .f label {
-        font-size: 12px;
-        color: #586168;
-        font-weight: 700
-      }
+      th.col-nombre,  td.col-nombre  { width: var(--col-nombre); }
+      th.col-canchas, td.col-canchas { width: var(--col-canchas); }
+      th.col-fini,    td.col-fini    { width: var(--col-fini); text-wrap: nowrap; }
+      th.col-ffin,    td.col-ffin    { width: var(--col-ffin); text-wrap: nowrap; }
+      th.col-hini,    td.col-hini    { width: var(--col-hini); text-wrap: nowrap; }
+      th.col-hfin,    td.col-hfin    { width: var(--col-hfin); text-wrap: nowrap; }
+      th.col-dias,    td.col-dias    { width: var(--col-dias); }
+      th.col-desc,    td.col-desc    { width: var(--col-desc); text-align:right; }
+      th.col-estado,  td.col-estado  { width: var(--col-estado); text-align:center; }
 
-      .f select,
-      .f input[type="date"],
-      .f input[type="text"],
-      .f input[type="number"] {
-        padding: 8px 10px;
-        border: 1px solid #d6dadd;
-        border-radius: 10px;
-        background: #fff;
-        outline: none
-      }
+      /* Pills estado */
+      .pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; white-space:nowrap; border:1px solid transparent }
+      .pk{ background:#e6f7f4; border-color:#c8efe8; color:#0f766e }   /* Activa */
+      .pp{ background:#fff7e6; border-color:#ffe1b5; color:#92400e }   /* Próxima */
+      .pb{ background:#fde8e8; border-color:#f8c9c9; color:#7f1d1d }   /* Finalizada */
 
-      /* inputs pequeños */
-      .f.tiny input,
-      .f.tiny select {
-        padding: 7px 8px;
-      }
+      /* Nombre + Descripción como en reportes */
+      .title-text, .desc-text{ white-space:normal; word-wrap:break-word; font-size:14px; color:#0f172a; }
+      .sub{ font-size:12px; color:#64748b; margin-top:4px; }
 
-      .f.search {
-        max-width: 320px
-      }
-
-      /* Buscar un poco más corto */
-      .summary {
-        margin: 8px 2px 12px;
-        color: #475569;
-        font-size: 13px
-      }
-
-      table {
-        width: 100%
-      }
-
-      thead th {
-        position: sticky;
-        top: 0;
-        background: #f8fafc;
-        z-index: 1
-      }
-
-      tbody tr:hover {
-        background: #f7fbfd
-      }
-
-      .pill {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 999px;
-        font-size: 12px;
-        white-space: nowrap;
-        border: 1px solid transparent
-      }
-
-      .pk {
-        background: #e6f7f4;
-        border-color: #c8efe8;
-        color: #0f766e
-      }
-
-      .pp {
-        background: #fff7e6;
-        border-color: #ffe1b5;
-        color: #995c00
-      }
-
-      .pb {
-        background: #fde8e8;
-        border-color: #f8c9c9;
-        color: #7f1d1d
-      }
-
-      .pt {
-        background: #e0ecff;
-        border-color: #bfd7ff;
-        color: #1e40af
-      }
-
-      /* anchos mínimos de columnas */
-      table tr td:nth-child(2) {
-        min-width: 170px
-      }
-
-      table tr td:nth-child(3) {
-        min-width: 160px
-      }
-
-      table tr td:nth-child(4) {
-        min-width: 150px
-      }
-
-      table tr td:nth-child(5) {
-        min-width: 140px
-      }
-
-      table tr td:nth-child(7) {
-        min-width: 110px
-      }
+      .truncate{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     </style>
 
     <form class="fbar" method="GET" id="promoFilters">
       <!-- Buscar -->
       <div class="f search">
         <label>Buscar</label>
-        <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Nombre o descripción">
+        <input type="text" name="q" value="<?= h($q) ?>" placeholder="Nombre o descripción">
       </div>
 
       <!-- Cancha -->
@@ -316,8 +236,9 @@ function aplicaHoyRow(array $p, string $hoy, string $now): bool
         <select name="cancha_id">
           <option value="0" <?= $cancha_id === 0 ? 'selected' : '' ?>>Todas</option>
           <?php foreach ($canchas as $c): ?>
-            <option value="<?= (int) $c['cancha_id'] ?>" <?= $c['cancha_id'] === $cancha_id ? 'selected' : '' ?>>
-              <?= htmlspecialchars($c['nombre']) ?></option>
+            <option value="<?= (int) $c['cancha_id'] ?>" <?= (int)$c['cancha_id'] === $cancha_id ? 'selected' : '' ?>>
+              <?= h($c['nombre']) ?>
+            </option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -325,26 +246,24 @@ function aplicaHoyRow(array $p, string $hoy, string $now): bool
       <!-- Desde / Hasta -->
       <div class="f">
         <label>Desde</label>
-        <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>">
+        <input type="date" name="desde" value="<?= h($desde) ?>">
       </div>
       <div class="f">
         <label>Hasta</label>
-        <input type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>">
+        <input type="date" name="hasta" value="<?= h($hasta) ?>">
       </div>
 
       <!-- % Desc. min / max (compactos) -->
       <div class="f tiny">
         <label>% Desc. mín</label>
-        <input type="number" step="0.01" name="pct_min" value="<?= htmlspecialchars($_GET['pct_min'] ?? '') ?>"
-          placeholder="0">
+        <input type="number" step="0.01" name="pct_min" value="<?= h($_GET['pct_min'] ?? '') ?>" placeholder="0">
       </div>
       <div class="f tiny">
         <label>% Desc. máx</label>
-        <input type="number" step="0.01" name="pct_max" value="<?= htmlspecialchars($_GET['pct_max'] ?? '') ?>"
-          placeholder="100">
+        <input type="number" step="0.01" name="pct_max" value="<?= h($_GET['pct_max'] ?? '') ?>" placeholder="100">
       </div>
 
-      <!-- Estado (compacto) -->
+      <!-- Estado -->
       <div class="f tiny">
         <label>Estado</label>
         <select name="estado">
@@ -362,59 +281,57 @@ function aplicaHoyRow(array $p, string $hoy, string $now): bool
     <table>
       <thead>
         <tr>
-          <th>Nombre</th>
-          <th>Cancha</th>
-          <th>Vigencia</th>
-          <th>Ventana horaria</th>
-          <th>Días</th>
-          <th>% Desc.</th>
-          <th>Estado</th>
-          <th>Hoy</th>
+          <th class="col-nombre">Nombre</th>
+          <th class="col-canchas">Canchas afectadas</th>
+          <th class="col-fini">Fecha inicio</th>
+          <th class="col-ffin">Fecha fin</th>
+          <th class="col-hini">Hora inicio</th>
+          <th class="col-hfin">Hora fin</th>
+          <th class="col-dias">Días</th>
+          <th class="col-desc">% Des.</th>
+          <th class="col-estado">Estado</th>
         </tr>
       </thead>
       <tbody>
-        <?php
-        if (empty($rows)): ?>
+        <?php if (empty($rows)): ?>
+          <tr><td colspan="9" style="text-align:center;">Sin promociones con esos filtros.</td></tr>
+        <?php else: foreach ($rows as $p):
+          $estadoTxt = estadoPromoFecha($p, $hoy);
+          $dias = diasLindos($p['dias_semana'] ?? null);
+          $pill = ['Activa' => 'pk', 'Próxima' => 'pp', 'Finalizada' => 'pb'][$estadoTxt] ?? 'pp';
+          $canchaTxt = $p['cancha_id'] ? ($p['cancha_nombre'] ?: ('#'.$p['cancha_id'])) : 'Todas las canchas';
+          $pct = number_format((float)$p['porcentaje_descuento'], 2, ',', '.').'%';
+        ?>
           <tr>
-            <td colspan="8" style="text-align:center;">Sin promociones con esos filtros.</td>
+            <!-- Nombre + descripción (estilo reportes) -->
+            <td class="col-nombre">
+              <div class="title-text"><strong><?= h($p['nombre']) ?></strong></div>
+              <?php if (!empty($p['descripcion'])): ?>
+                <div class="sub desc-text"><?= nl2br(h($p['descripcion'])) ?></div>
+              <?php endif; ?>
+            </td>
+
+            <td class="col-canchas"><span class="truncate"><?= h($canchaTxt) ?></span></td>
+            <td class="col-fini"><?= h(ddmm($p['fecha_inicio'])) ?></td>
+            <td class="col-ffin"><?= h(ddmm($p['fecha_fin'])) ?></td>
+            <td class="col-hini"><?= h(hhmm($p['hora_inicio'])) ?></td>
+            <td class="col-hfin"><?= h(hhmm($p['hora_fin'])) ?></td>
+            <td class="col-dias"><span class="truncate"><?= h($dias) ?></span></td>
+            <td class="col-desc"><?= h($pct) ?></td>
+            <td class="col-estado">
+              <span class="pill <?= $pill ?>">
+                <?= $estadoTxt ?><?= ((int)$p['activa']===1 ? '' : ' (inactiva)') ?>
+              </span>
+            </td>
           </tr>
-          <?php
-        else:
-          foreach ($rows as $p):
-            $estadoTxt = estadoPromoFecha($p, $hoy);
-            $ini = date('d/m', strtotime($p['fecha_inicio']));
-            $fin = date('d/m', strtotime($p['fecha_fin']));
-            if ($p['hora_inicio'] && $p['hora_fin']) {
-              $hor = substr($p['hora_inicio'], 0, 5) . ' - ' . substr($p['hora_fin'], 0, 5);
-            } elseif ($p['hora_inicio'] || $p['hora_fin']) {
-              $hor = substr(($p['hora_inicio'] ?? ''), 0, 5) . ' ' . substr(($p['hora_fin'] ?? ''), 0, 5);
-            } else {
-              $hor = 'Todos el día';
-            }
-            $dias = diasLindos($p['dias_semana'] ?? null);
-            $pill = ['Activa' => 'pk', 'Próxima' => 'pp', 'Finalizada' => 'pb'][$estadoTxt] ?? 'pp';
-            $aplica = aplicaHoyRow($p, $hoy, $now);
-            ?>
-            <tr>
-              <td><?= htmlspecialchars($p['nombre']) ?></td>
-              <td><?= htmlspecialchars($p['cancha_nombre'] ?? 'Todas') ?></td>
-              <td><?= $ini ?> — <?= $fin ?></td>
-              <td><?= htmlspecialchars($hor) ?></td>
-              <td><?= htmlspecialchars($dias) ?></td>
-              <td><?= number_format((float) $p['porcentaje_descuento'], 2) ?>%</td>
-              <td><span class="pill <?= $pill ?>"><?= $estadoTxt ?><?= $p['activa'] ? '' : ' (inactiva)' ?></span></td>
-              <td>
-                <?= $aplica ? '<span class="pill pt">Aplica hoy</span>' : '<span class="pill pb" style="opacity:.6">No</span>' ?>
-              </td>
-            </tr>
-          <?php endforeach; endif; ?>
+        <?php endforeach; endif; ?>
       </tbody>
     </table>
   </div>
 </main>
 
 <script>
-  // autosubmit elegante
+  // autosubmit elegante (tu base)
   (function () {
     const f = document.getElementById('promoFilters');
     if (!f) return;
