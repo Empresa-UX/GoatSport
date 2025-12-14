@@ -40,10 +40,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 mysqli_stmt_fetch($stmt);
 
                 $ok = false;
-                if (is_string($user_password) && str_starts_with($user_password, '$')) {
+                // por qué: compatibilidad con hashes modernos y contraseñas legadas
+                if (is_string($user_password) && str_starts_with((string)$user_password, '$')) {
                     $ok = password_verify($password, $user_password);
                 }
-                if (!$ok) { $ok = hash_equals((string)$user_password, (string)$password); }
+                if (!$ok) {
+                    $ok = hash_equals((string)$user_password, (string)$password);
+                }
 
                 if ($ok) {
                     $_SESSION['usuario_id']    = (int)$user_id;
@@ -51,7 +54,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $_SESSION['rol']           = $rol;
 
                     if ($rol === 'recepcionista') {
-                        // Cargar proveedor_id desde recepcionista_detalle
+                        // por qué: sin vínculo no puede operar sobre canchas del proveedor
                         $prov = 0;
                         if ($q = $conn->prepare("SELECT proveedor_id FROM recepcionista_detalle WHERE recepcionista_id = ? LIMIT 1")) {
                             $q->bind_param("i", $user_id);
@@ -61,7 +64,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             $q->close();
                         }
                         if ($prov <= 0) {
-                            // por qué: sin vínculo no puede listar canchas ni operar
                             $_SESSION['flash_error'] = 'Tu usuario de recepción no está vinculado a un proveedor. Contactá al admin.';
                             header("Location: ./recepcionista/home_recepcionista.php"); exit;
                         }
@@ -90,20 +92,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     mysqli_close($conn);
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link rel="icon" type="image/png" href="/img/isotipo_negro.jpeg">
-    <title>Padel Alquiler | Login</title>
+    <title>GoatSport | Login</title>
     <style>
         * { font-family: 'Arial', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
         body { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, #054a56ff, #1bab9dff); }
         .logo-container { text-align: center; margin-bottom: 10px; }
         .logo-container img { width: 160px; }
-        .login-box { width: 350px; height: 420px; background: white; padding: 35px 30px; border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.15); text-align: center; }
+        .login-box { width: 350px; background: white; padding: 35px 30px; border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.15); text-align: center; }
         h1 { margin-bottom: 20px; font-size: 1.7rem; color: #054a56; }
         .input-group { position: relative; margin-bottom: 20px; }
         .input-group input { width: 100%; padding: 15px 42px 15px 15px; border: 1px solid #ccc; border-radius: 10px; font-size: 16px; background-color: #f9f9f9; transition: border-color 0.3s; }
@@ -114,6 +115,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         .extra-links { margin-top: 18px; font-size: 14px; display: flex; gap: 12px; justify-content: center; }
         .extra-links a { color: #1bab9dff; text-decoration: none; }
         .extra-links a:hover { text-decoration: underline; }
+        .extra-link-prove { margin-top: 14px; font-size: 14px; text-align: center; }
+        .extra-link-prove a { color: #1bab9dff; text-decoration: none; }
+        .extra-link-prove a:hover { text-decoration: underline; }
         .error { color: #b00020; margin-bottom: 10px; }
     </style>
 </head>
@@ -137,7 +141,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             <div class="input-group">
                 <input type="password" name="password" placeholder="Contraseña" required>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 9V7a5 5 0 0 0-10 0v2H5v14h14V9h-2zm-6-2a3 3 0 0 1 6 0v2H11V7z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 9V7a5 5 0 0 0-10 0v2H5v14h14V9h-2zm-6-2a 3 3 0 0 1 6 0v2H11V7z"/></svg>
             </div>
 
             <button type="submit" class="btn">Ingresar</button>
@@ -146,6 +150,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <div class="extra-links">
             <a href="register.php">¿No tienes una cuenta?</a>
             <a href="forgot.php">¿Olvidaste tu contraseña?</a>
+        </div>
+
+        <div class="extra-link-prove">
+            <a href="register_proveedor.php">¿Sos proveedor? Ingresá acá</a>
         </div>
     </div>
 </body>
