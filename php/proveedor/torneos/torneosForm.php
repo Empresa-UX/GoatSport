@@ -28,7 +28,7 @@ if ($old) {
   $nombre = $old['nombre'] ?? $nombre;
   $fecha_inicio = $old['fecha_inicio'] ?? $fecha_inicio;
   $fecha_fin = $old['fecha_fin'] ?? $fecha_fin;
-  $estado = $old['estado'] ?? $estado;
+  // estado NO se toma del old (siempre abierto en este form)
   $tipo = $old['tipo'] ?? $tipo;
   $capacidad = (int)($old['capacidad'] ?? $capacidad);
   $puntos_ganador = (int)($old['puntos_ganador'] ?? $puntos_ganador);
@@ -47,16 +47,19 @@ if ($torneo_id) {
       $nombre = $row['nombre'] ?? '';
       $fecha_inicio = $row['fecha_inicio'] ?? '';
       $fecha_fin = $row['fecha_fin'] ?? '';
-      $estado = $row['estado'] ?? 'abierto';
+      // estado NO se edita desde acá; se manda abierto
       $tipo = $row['tipo'] ?? 'equipo';
       $capacidad = (int)($row['capacidad'] ?? 8);
-      $puntos_ganador = (int)($row['puntos_ganador'] ?? 0);
+      $puntos_ganador = (int)($row['puntos_ganador'] ?? 100);
     }
   } else {
     $st->close(); header('Location: torneos.php'); exit;
   }
   $st->close();
 }
+
+// Siempre abierto desde este form
+$estado = 'abierto';
 ?>
 <style>
   .form-container{background:#fff;border-radius:12px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,.08);max-width:760px;}
@@ -91,6 +94,9 @@ if ($torneo_id) {
     <input type="hidden" name="action" value="<?= htmlspecialchars($accion) ?>">
     <input type="hidden" name="torneo_id" value="<?= (int)$torneo_id ?>">
 
+    <!-- Estado fijo (no editable) -->
+    <input type="hidden" name="estado" value="abierto">
+
     <div class="full">
       <label>Nombre del torneo</label>
       <input type="text" name="nombre" value="<?= htmlspecialchars($nombre) ?>" required>
@@ -98,37 +104,39 @@ if ($torneo_id) {
 
     <div>
       <label>Fecha de inicio</label>
-      <input type="date" name="fecha_inicio" value="<?= htmlspecialchars($fecha_inicio) ?>" required>
+      <input type="date" name="fecha_inicio" value="<?= htmlspecialchars($fecha_inicio) ?>"
+            min="<?= date('Y-m-d', strtotime('+3 days')) ?>" required>
     </div>
     <div>
       <label>Fecha de fin</label>
-      <input type="date" name="fecha_fin" value="<?= htmlspecialchars($fecha_fin) ?>" required>
+      <input type="date" name="fecha_fin" value="<?= htmlspecialchars($fecha_fin) ?>"
+            min="<?= date('Y-m-d', strtotime('+3 days')) ?>" required>
     </div>
 
-    <div>
-      <label>Estado</label>
-      <select name="estado" required>
-        <option value="abierto"    <?= $estado==='abierto'?'selected':'' ?>>Abierto</option>
-        <option value="cerrado"    <?= $estado==='cerrado'?'selected':'' ?>>Cerrado</option>
-        <option value="finalizado" <?= $estado==='finalizado'?'selected':'' ?>>Finalizado</option>
-      </select>
-    </div>
-    <div>
-      <label>Tipo</label>
-      <select name="tipo" required>
-        <option value="equipo"     <?= $tipo==='equipo'?'selected':'' ?>>Equipo</option>
-        <option value="individual" <?= $tipo==='individual'?'selected':'' ?>>Individual</option>
-      </select>
-    </div>
-
+    <!-- Tipo + Capacidad + Puntos ganador en una fila -->
     <div class="row-3 full">
       <div>
-        <label>Capacidad (número par)</label>
-        <input type="number" name="capacidad" min="2" step="2" value="<?= (int)$capacidad ?>" required>
+        <label>Tipo</label>
+        <select name="tipo" required>
+          <option value="equipo"     <?= $tipo==='equipo'?'selected':'' ?>>Equipo</option>
+          <option value="individual" <?= $tipo==='individual'?'selected':'' ?>>Individual</option>
+        </select>
       </div>
+
+      <div>
+        <label>Capacidad</label>
+        <select name="capacidad" required>
+          <?php foreach ([4,8,16,32,64] as $opt): ?>
+            <option value="<?= $opt ?>" <?= ((int)$capacidad === $opt) ? 'selected' : '' ?>><?= $opt ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+
       <div>
         <label>Puntos ganador</label>
-        <input type="number" name="puntos_ganador" min="0" step="1" value="<?= (int)$puntos_ganador ?>" required>
+        <input type="number" name="puntos_ganador"
+              min="100" step="1"
+              value="<?= max(100, (int)$puntos_ganador) ?>" required>
       </div>
     </div>
 
@@ -142,24 +150,58 @@ if ($torneo_id) {
 <script>
 (function(){
   const f = document.getElementById('formTorneo');
+
+  function toISODate(d){
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  // +3 días desde hoy (local)
+  const minDateObj = new Date();
+  minDateObj.setHours(0,0,0,0);
+  minDateObj.setDate(minDateObj.getDate() + 3);
+  const minDate = toISODate(minDateObj);
+
+  if (f.fecha_inicio) f.fecha_inicio.min = minDate;
+  if (f.fecha_fin) f.fecha_fin.min = minDate;
+
+  if (f.fecha_inicio && f.fecha_fin) {
+    f.fecha_inicio.addEventListener('change', function(){
+      const fi = f.fecha_inicio.value || '';
+      f.fecha_fin.min = fi ? fi : minDate;
+      if (f.fecha_fin.value && fi && f.fecha_fin.value < fi) {
+        f.fecha_fin.value = fi;
+      }
+    });
+  }
+
   f.addEventListener('submit', function(e){
     const errs=[];
     const nombre = (f.nombre.value||'').trim();
     const fi = f.fecha_inicio.value||'';
     const ff = f.fecha_fin.value||'';
-    const cap = parseInt(f.capacidad.value||'0',10);
+    const cap = (f.capacidad.value||'').trim();
     const pts = parseInt(f.puntos_ganador.value||'-1',10);
-    const estado = (f.estado.value||'').trim();
     const tipo = (f.tipo.value||'').trim();
 
     if(!nombre) errs.push('El nombre es obligatorio.');
     if(!fi) errs.push('La fecha de inicio es obligatoria.');
     if(!ff) errs.push('La fecha de fin es obligatoria.');
+
+    if (fi && fi < minDate) errs.push('La fecha de inicio debe ser al menos 3 días después de hoy.');
+    if (ff && ff < minDate) errs.push('La fecha de fin debe ser al menos 3 días después de hoy.');
     if(fi && ff && ff < fi) errs.push('La fecha de fin no puede ser anterior a la de inicio.');
-    if(!['abierto','cerrado','finalizado'].includes(estado)) errs.push('Estado inválido.');
+
     if(!['equipo','individual'].includes(tipo)) errs.push('Tipo inválido.');
-    if(isNaN(cap) || cap < 2 || cap % 2 !== 0) errs.push('Capacidad debe ser un número par y mayor o igual a 2.');
-    if(isNaN(pts) || pts < 0) errs.push('Puntos ganador inválido.');
+
+    const allowedCaps = ['4','8','16','32','64'];
+    if(!allowedCaps.includes(cap)) errs.push('Capacidad inválida. Debe ser 4, 8, 16, 32 o 64.');
+
+    if (isNaN(pts) || pts < 100 || !Number.isInteger(pts)) {
+      errs.push('Puntos ganador debe ser un número entero mayor o igual a 100.');
+    }
 
     if(errs.length){ e.preventDefault(); alert(errs.join('\n')); }
   });

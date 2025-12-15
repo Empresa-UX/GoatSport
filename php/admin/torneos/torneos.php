@@ -3,11 +3,17 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 include __DIR__ . '/../includes/cards.php';
 include __DIR__ . '/../../config.php';
+
+if (session_status() === PHP_SESSION_NONE) session_start();
 $rol = $_SESSION['rol'] ?? null;
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function ddmm(?string $ymd): string { $t = $ymd? strtotime($ymd):0; return $t? date('d/m',$t):'—'; }
-function estadoClase(string $e): string { $e=strtolower($e); return $e==='abierto'?'st-open':($e==='finalizado'?'st-done':'st-closed'); }
+
+function estadoClase(string $e): string {
+  $e = strtolower($e);
+  return $e === 'abierto' ? 'st-open' : ($e === 'finalizado' ? 'st-done' : ($e === 'en curso' ? 'st-live' : 'st-closed'));
+}
 function tipoClase(string $t): string { return strtolower($t)==='individual'?'tp-ind':'tp-team'; }
 
 /* DATA */
@@ -15,15 +21,32 @@ $sql = "
   SELECT
     t.torneo_id, t.nombre, t.fecha_inicio, t.fecha_fin, t.estado,
     t.tipo, t.capacidad, t.puntos_ganador, t.proveedor_id,
-    COALESCE(pd.nombre_club, pu.nombre) AS proveedor_label
+    COALESCE(pd.nombre_club, pu.nombre) AS proveedor_label,
+
+    COALESCE(pm.total,0)      AS partidos_total,
+    COALESCE(pm.jugados,0)    AS partidos_jugados,
+    COALESCE(pm.pendientes,0) AS partidos_pendientes
   FROM torneos t
   LEFT JOIN usuarios pu ON pu.user_id = t.proveedor_id
   LEFT JOIN proveedores_detalle pd ON pd.proveedor_id = t.proveedor_id
+
+  LEFT JOIN (
+    SELECT
+      torneo_id,
+      COUNT(*) AS total,
+      SUM(CASE WHEN ganador_id IS NOT NULL AND resultado IS NOT NULL THEN 1 ELSE 0 END) AS jugados,
+      SUM(CASE WHEN ganador_id IS NULL OR resultado IS NULL THEN 1 ELSE 0 END) AS pendientes
+    FROM partidos
+    GROUP BY torneo_id
+  ) pm ON pm.torneo_id = t.torneo_id
+
   ORDER BY t.fecha_inicio DESC, t.torneo_id DESC
 ";
+
 $res  = $conn->query($sql);
 $rows = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
 
+/* Proveedores para filtro */
 $provRes = $conn->query("
   SELECT u.user_id, COALESCE(pd.nombre_club,u.nombre) AS label
   FROM usuarios u
@@ -31,6 +54,31 @@ $provRes = $conn->query("
   WHERE u.rol='proveedor' ORDER BY label ASC
 ");
 $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
+
+/* Estado dinámico: en curso / finalizado según fechas */
+$hoy = date('Y-m-d');
+foreach ($rows as &$r) {
+  $est = strtolower($r['estado'] ?? 'abierto');
+  $fi  = $r['fecha_inicio'] ?? null;
+  $ff  = $r['fecha_fin'] ?? null;
+
+  $total = (int)($r['partidos_total'] ?? 0);
+  $pend  = (int)($r['partidos_pendientes'] ?? 0);
+
+  if ($total > 0 && $pend === 0) {
+    $r['estado_runtime'] = 'finalizado';
+  } elseif ($est === 'finalizado') {
+    $r['estado_runtime'] = 'finalizado';
+  } elseif ($ff && $hoy > $ff) {
+    $r['estado_runtime'] = 'finalizado';
+  } elseif ($fi && $ff && $fi <= $hoy && $hoy <= $ff) {
+    $r['estado_runtime'] = 'en curso';
+  } else {
+    $r['estado_runtime'] = $est;
+  }
+}
+unset($r);
+
 ?>
 <div class="section">
   <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
@@ -56,19 +104,21 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
     .truncate{ display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
 
     .col-id{width:42px}.col-nom{width:200px}.col-prov{width:180px}.col-fe{width:70px}
-    .col-es{width:90px; text-align: center;}.col-ti{width:90px; text-align: center;}.col-cap{width:90px}.col-pts{width:120px}.col-acc{width:210px; text-align: center;}
+    .col-es{width:90px; text-align: center;}.col-ti{width:90px; text-align: center;}.col-cap{width:90px}.col-pts{width:120px}.col-acc{width:220px; text-align: center;}
 
     .pill{ display:inline-block;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid transparent;white-space:nowrap }
     .st-open{background:#e6f7f4;border-color:#c8efe8;color:#0f766e}
     .st-closed{background:#fff7e6;border-color:#ffe2b8;color:#92400e}
     .st-done{background:#eef2ff;border-color:#c7d2fe;color:#3730a3}
+    .st-live{background:#ffeaf2;border-color:#ffc8dc;color:#b31258}
     .tp-team{background:#e0ecff;border-color:#bfd7ff;color:#1e40af}
     .tp-ind{background:#fde8f1;border-color:#f8c7da;color:#a11a5b}
 
     .btn-action{appearance:none;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:700}
     .btn-action.part{background:#e6f7f4;border:1px solid #c8efe8;color:#0f766e}
+    .btn-action.plan{background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3}
     .btn-action.delete{background:#fde8e8;border:1px solid #f8c9c9;color:#7f1d1d}
-    .actions{display:flex;gap:6px;flex-wrap:wrap}
+    .actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
   </style>
 
   <!-- Filtros -->
@@ -77,11 +127,19 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
     <div class="f">
       <label>Proveedor (club)</label>
       <select id="f-prov"><option value="">Todos</option>
-        <?php foreach($proveedores as $p): ?><option value="<?= (int)$p['user_id']?>"><?=h($p['label'])?></option><?php endforeach;?>
+        <?php foreach($proveedores as $p): ?>
+          <option value="<?= (int)$p['user_id']?>"><?=h($p['label'])?></option>
+        <?php endforeach;?>
       </select>
     </div>
     <div class="f"><label>Estado</label>
-      <select id="f-estado"><option value="">Todos</option><option value="abierto">Abierto</option><option value="cerrado">Cerrado</option><option value="finalizado">Finalizado</option></select>
+      <select id="f-estado">
+        <option value="">Todos</option>
+        <option value="abierto">Abierto</option>
+        <option value="en curso">En curso</option>
+        <option value="cerrado">Cerrado</option>
+        <option value="finalizado">Finalizado</option>
+      </select>
     </div>
     <div class="f"><label>Tipo</label>
       <select id="f-tipo"><option value="">Todos</option><option value="individual">Individual</option><option value="equipo">Equipo</option></select>
@@ -95,9 +153,16 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
   <table id="tablaTorneos">
     <thead>
       <tr>
-        <th class="col-id">ID</th><th class="col-nom">Nombre del torneo</th><th class="col-prov">Creador (club)</th>
-        <th class="col-fe">Inicio</th><th class="col-fe">Fin</th><th class="col-es">Estado</th>
-        <th class="col-ti">Tipo</th><th class="col-cap">Capacidad</th><th class="col-pts">Puntos ganador</th><th class="col-acc">Acciones</th>
+        <th class="col-id">ID</th>
+        <th class="col-nom">Nombre del torneo</th>
+        <th class="col-prov">Creador (club)</th>
+        <th class="col-fe">Inicio</th>
+        <th class="col-fe">Fin</th>
+        <th class="col-es">Estado</th>
+        <th class="col-ti">Tipo</th>
+        <th class="col-cap">Capacidad</th>
+        <th class="col-pts">Puntos ganador</th>
+        <th class="col-acc">Acciones</th>
       </tr>
     </thead>
     <tbody>
@@ -107,13 +172,24 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
         $ini=ddmm($r['fecha_inicio']); $fin=ddmm($r['fecha_fin']);
         $iDay=$r['fecha_inicio']? (int)date('j',strtotime($r['fecha_inicio'])):''; $iMon=$r['fecha_inicio']? (int)date('n',strtotime($r['fecha_inicio'])):'';
         $fDay=$r['fecha_fin']? (int)date('j',strtotime($r['fecha_fin'])):''; $fMon=$r['fecha_fin']? (int)date('n',strtotime($r['fecha_fin'])):'';
-        $estado=strtolower($r['estado']??''); $tipo=strtolower($r['tipo']??'equipo');
+
+        $estado = strtolower($r['estado_runtime'] ?? $r['estado'] ?? 'abierto'); // <-- runtime
+        $tipo   = strtolower($r['tipo'] ?? 'equipo');
+
         $stCls=estadoClase($estado); $tpCls=tipoClase($tipo);
         $provId=(int)($r['proveedor_id']??0); $provLb=$r['proveedor_label']?:'—';
         $txt=mb_strtolower(($r['nombre']??'').' '.$provLb,'UTF-8');
+
+        $esEnCurso   = ($estado === 'en curso');
+        $esFinalizado= ($estado === 'finalizado');
+        $btnText = $esFinalizado ? 'Ver resultados' : ($esEnCurso ? 'Cronograma' : 'Participantes');
+        $btnHref = $esEnCurso ? 'torneoCronograma.php' : 'torneoParticipantes.php';
       ?>
       <tr
-        data-text="<?=h($txt)?>" data-prov="<?=$provId?:''?>" data-estado="<?=h($estado)?>" data-tipo="<?=h($tipo)?>"
+        data-text="<?=h($txt)?>"
+        data-prov="<?=$provId?:''?>"
+        data-estado="<?=h($estado)?>"
+        data-tipo="<?=h($tipo)?>"
         data-i-dia="<?=$iDay?>" data-i-mes="<?=$iMon?>" data-f-dia="<?=$fDay?>" data-f-mes="<?=$fMon?>"
       >
         <td class="col-id"><?= (int)$r['torneo_id']?></td>
@@ -127,8 +203,15 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
         <td class="col-pts"><?= (int)($r['puntos_ganador']??0)?></td>
         <td class="col-acc">
           <div class="actions">
-            <button class="btn-action part" onclick="location.href='torneoParticipantes.php?torneo_id=<?= (int)$r['torneo_id']?>'">Participantes</button>
-            <form method="POST" action="torneosAction.php" onsubmit="return confirm('¿Eliminar torneo?');" style="display:inline-block">
+            <button
+              class="btn-action <?= $esEnCurso ? 'plan' : 'part' ?>"
+              onclick="location.href='<?= $btnHref ?>?torneo_id=<?= (int)$r['torneo_id']?>'">
+              <?= h($btnText) ?>
+            </button>
+
+            <form method="POST" action="torneosAction.php"
+              onsubmit="return confirm('¿Eliminar torneo?');"
+              style="display:inline-block">
               <input type="hidden" name="action" value="delete">
               <input type="hidden" name="torneo_id" value="<?= (int)$r['torneo_id']?>">
               <button type="submit" class="btn-action delete">Eliminar</button>
@@ -140,15 +223,24 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
     </tbody>
   </table>
 </div>
+
 <script>
 (function(){
   const $  = s=>document.querySelector(s);
   const $$ = s=>Array.from(document.querySelectorAll(s));
   const rows = $$('#tablaTorneos tbody tr');
   const norm = s => (s||'').toString().toLowerCase();
+
   function apply(){
-    const q=norm($('#f-q')?.value), prov=$('#f-prov')?.value||'', est=$('#f-estado')?.value||'', tipo=$('#f-tipo')?.value||'';
-    const iD=$('#f-i-dia')?.value||'', iM=$('#f-i-mes')?.value||'', fD=$('#f-f-dia')?.value||'', fM=$('#f-f-mes')?.value||'';
+    const q=norm($('#f-q')?.value),
+          prov=$('#f-prov')?.value||'',
+          est=$('#f-estado')?.value||'',
+          tipo=$('#f-tipo')?.value||'';
+    const iD=$('#f-i-dia')?.value||'',
+          iM=$('#f-i-mes')?.value||'',
+          fD=$('#f-f-dia')?.value||'',
+          fM=$('#f-f-mes')?.value||'';
+
     rows.forEach(tr=>{
       const show =
         (q===''|| (tr.dataset.text||'').includes(q)) &&
@@ -159,13 +251,18 @@ $proveedores = $provRes ? $provRes->fetch_all(MYSQLI_ASSOC) : [];
         (iM==='' || String(tr.dataset.iMes)===String(iM)) &&
         (fD==='' || String(tr.dataset.fDia)===String(fD)) &&
         (fM==='' || String(tr.dataset.fMes)===String(fM));
+
       tr.style.display = show ? '' : 'none';
     });
   }
+
   ['#f-q','#f-prov','#f-estado','#f-tipo','#f-i-dia','#f-i-mes','#f-f-dia','#f-f-mes'].forEach(id=>{
-    const el=document.querySelector(id); if(el) el.addEventListener(id==='#f-q'?'input':'change',apply);
+    const el=document.querySelector(id);
+    if(el) el.addEventListener(id==='#f-q'?'input':'change',apply);
   });
+
   apply();
 })();
 </script>
+
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -12,11 +12,11 @@ if ($partido_id <= 0) { echo "<main><div class='section'><p>Partido inválido.</
 
 $sql = "
 SELECT
-  p.partido_id, p.torneo_id, p.jugador1_id, p.jugador2_id, p.fecha, p.resultado, p.ganador_id, p.reserva_id,
+  p.partido_id, p.torneo_id, p.jugador1_id, p.jugador2_id, p.fecha AS p_fecha, p.resultado, p.ganador_id, p.reserva_id,
   t.nombre AS torneo_nombre, t.proveedor_id AS prov_torneo,
   u1.nombre AS jugador1_nombre, u2.nombre AS jugador2_nombre,
   c.nombre  AS cancha_nombre, c.proveedor_id AS prov_cancha,
-  r.hora_inicio, r.hora_fin, r.tipo_reserva
+  r.fecha AS r_fecha, r.hora_inicio AS r_hora_inicio, r.hora_fin AS r_hora_fin, r.tipo_reserva
 FROM partidos p
 LEFT JOIN torneos t   ON t.torneo_id = p.torneo_id
 LEFT JOIN usuarios u1 ON u1.user_id = p.jugador1_id
@@ -42,18 +42,40 @@ if (!$match || !$allowed) {
   include __DIR__ . '/../includes/footer.php'; exit;
 }
 
-$fechaYmd  = date('Y-m-d', strtotime($match['fecha']));
-$fechaLeg  = date('d/m/Y', strtotime($match['fecha']));
-$hora_ini  = $match['hora_inicio'] ? substr($match['hora_inicio'],0,5) : date('H:i', strtotime($match['fecha']));
-$hora_fin  = $match['hora_fin']    ? substr($match['hora_fin'],0,5)    : null;
+/* Fechas/horas legibles */
+$fechaYmd  = date('Y-m-d', strtotime($match['p_fecha']));
+$fechaLeg  = date('d/m/Y', strtotime($match['p_fecha']));
+$hora_ini  = !empty($match['r_hora_inicio']) ? substr($match['r_hora_inicio'],0,5) : date('H:i', strtotime($match['p_fecha']));
+$hora_fin  = !empty($match['r_hora_fin'])    ? substr($match['r_hora_fin'],0,5)    : null;
 $horario   = $hora_fin ? ($hora_ini . ' - ' . $hora_fin) : $hora_ini;
 
-$j1id=(int)$match['jugador1_id']; $j2id=(int)$match['jugador2_id'];
+/* Inicio real para bloqueo */
+$startStr = (!empty($match['r_fecha']) && !empty($match['r_hora_inicio']))
+  ? ($match['r_fecha'].' '.$match['r_hora_inicio'])
+  : $match['p_fecha'];
+$now   = new DateTimeImmutable('now');
+$start = new DateTimeImmutable($startStr);
+$lockedByTime = ($now < $start); // why: no cargar antes de que inicie
+
+$j1id=(int)($match['jugador1_id'] ?? 0);
+$j2id=(int)($match['jugador2_id'] ?? 0);
 $j1n  = htmlspecialchars($match['jugador1_nombre'] ?? 'Jugador 1');
 $j2n  = htmlspecialchars($match['jugador2_nombre'] ?? 'Jugador 2');
 $gId  = (int)($match['ganador_id'] ?? 0);
 $isEquipo = ($match['tipo_reserva'] ?? '') === 'equipo';
 $lblJugadores = $isEquipo ? 'Equipos' : 'Jugadores';
+
+/* Bloqueos previos */
+if ($j1id<=0 || $j2id<=0) {
+  echo "<main><div class='section'><p>Este partido todavía no tiene ambos jugadores definidos (fixture pendiente). Volvé más tarde.</p>
+        <p><a href='partidos.php?fecha=".urlencode($fechaYmd)."'>Volver</a></p></div></main>";
+  include __DIR__ . '/../includes/footer.php'; exit;
+}
+if ($lockedByTime) {
+  echo "<main><div class='section'><p>Este partido empieza a las <strong>".htmlspecialchars($hora_ini)."</strong>. Aún no podés cargar el resultado.</p>
+        <p><a href='partidos.php?fecha=".urlencode($fechaYmd)."'>Volver</a></p></div></main>";
+  include __DIR__ . '/../includes/footer.php'; exit;
+}
 ?>
 <main>
   <style>
@@ -108,7 +130,7 @@ $lblJugadores = $isEquipo ? 'Equipos' : 'Jugadores';
              placeholder="Ej: 6-4 6-3  |  6-7 7-6 10-8"
              value="<?= htmlspecialchars($match['resultado'] ?? '') ?>"
              maxlength="50"
-             pattern="^([0-9]{1,2}-[0-9]{1,2})(\s+[0-9]{1,2}-[0-9]{1,2}){1,4}$"
+             pattern="^([0-9]{1,2}-[0-9]{1,2})(\\s+[0-9]{1,2}-[0-9]{1,2}){1,4}$"
              aria-describedby="resultadoHint" required>
 
       <label class="field">Ganador</label>

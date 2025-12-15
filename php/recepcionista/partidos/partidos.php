@@ -31,7 +31,7 @@ SELECT
   t.proveedor_id AS prov_torneo,
   u1.nombre AS jugador1_nombre, u2.nombre AS jugador2_nombre,
   c.nombre  AS cancha_nombre, c.proveedor_id AS prov_cancha,
-  r.hora_inicio, r.hora_fin, r.cancha_id AS r_cancha_id, r.tipo_reserva
+  r.fecha AS r_fecha, r.hora_inicio, r.hora_fin, r.cancha_id AS r_cancha_id, r.tipo_reserva
 FROM partidos p
 LEFT JOIN torneos t   ON t.torneo_id = p.torneo_id
 LEFT JOIN usuarios u1 ON u1.user_id = p.jugador1_id
@@ -69,54 +69,36 @@ $stmt->close();
 
   <style>
     :root{
-      /* ======= Anchos manipulables ======= */
-      --col-id:     30px;
-      --col-hora:   110px;
-      --col-cancha: 180px;
-      --col-j1:     140px;
-      --col-j2:     140px;
-      --col-res:    80px;
-      --col-gana:   140px;
-      --col-estado: 90px;
-      --col-acc:    220px;
+      --col-id:30px; --col-hora:110px; --col-cancha:180px; --col-j1:140px; --col-j2:140px;
+      --col-res:80px; --col-gana:140px; --col-estado:90px; --col-acc:240px;
     }
-
     .filterbar{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:14px 0 16px}
     .f-field{display:flex;flex-direction:column;gap:6px;min-width:200px}
     .f-field.tiny{min-width:180px}
     .f-label{font-size:12px;color:#586168;font-weight:600;letter-spacing:.3px}
     .f-input,.f-select,.f-date{width:100%;padding:10px 12px;border:1px solid #d6dadd;border-radius:10px;background:#fff;outline:none;transition:border-color .2s,box-shadow .2s;box-shadow:0 1px 0 rgba(0,0,0,.03)}
     .f-input:focus,.f-select:focus,.f-date:focus{border-color:#1bab9d;box-shadow:0 0 0 3px rgba(27,171,157,.12)}
-
     table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border-radius:12px;overflow:hidden;table-layout:fixed}
     thead th{position:sticky;top:0;background:#f8fafc;z-index:1;text-align:left;font-weight:700;padding:10px 12px;font-size:13px;color:#334155;border-bottom:1px solid #e5e7eb;}
     tbody td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
-
-    th.col-id,      td.col-id      { width:var(--col-id); }
-    th.col-hora,    td.col-hora    { width:var(--col-hora); }
-    th.col-cancha,  td.col-cancha  { width:var(--col-cancha); }
-    th.col-j1,      td.col-j1      { width:var(--col-j1); }
-    th.col-j2,      td.col-j2      { width:var(--col-j2); }
-    th.col-res,     td.col-res     { width:var(--col-res); }
-    th.col-gana,    td.col-gana    { width:var(--col-gana); }
-    th.col-estado,  td.col-estado  { width:var(--col-estado); }
-    th.col-acc,     td.col-acc     { width:var(--col-acc); }
-
+    th.col-id,td.col-id{width:var(--col-id)} th.col-hora,td.col-hora{width:var(--col-hora)}
+    th.col-cancha,td.col-cancha{width:var(--col-cancha)} th.col-j1,td.col-j1{width:var(--col-j1)}
+    th.col-j2,td.col-j2{width:var(--col-j2)} th.col-res,td.col-res{width:var(--col-res)}
+    th.col-gana,td.col-gana{width:var(--col-gana)} th.col-estado,td.col-estado{width:var(--col-estado)}
+    th.col-acc,td.col-acc{width:var(--col-acc)}
     .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;white-space:nowrap}
     .pill-ok{background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9}
     .pill-pend{background:#ffebee;color:#c62828;border:1px solid #ffcdd2}
-
-    /* Botones azulsito/rojito */
     .action-buttons{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
     .btn-action{appearance:none;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:500;text-decoration:none;font-size:13px;display:inline-flex;align-items:center;justify-content:center}
-    .btn-action.edit{background:#e0ecff;border:1px solid #bfd7ff;color:#1e40af;}     /* Azul: Cargar/Editar */
-    .btn-action.delete-hard{background:#fee2e2;border:1px solid #fca5a5;color:#7f1d1d;} /* Rojo fuerte: Eliminar partido */
-
+    .btn-action.edit{background:#e0ecff;border:1px solid #bfd7ff;color:#1e40af;}
+    .btn-action.delete-hard{background:#fee2e2;border:1px solid #fca5a5;color:#7f1d1d;}
+    .btn-action.disabled{opacity:.55;cursor:not-allowed;pointer-events:none;background:#e5e7eb;border:1px solid #cbd5e1;color:#64748b}
     .truncate{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   </style>
 
   <div class="section">
-    <div class="section-header"><h2>Partidos amistosos</h2></div>
+    <div class="section-header"><h2>Partidos</h2></div>
 
     <form method="GET" class="filterbar" id="filtersForm">
       <div class="f-field"><label class="f-label">Fecha</label><input class="f-date" type="date" name="fecha" value="<?= htmlspecialchars($fecha) ?>"></div>
@@ -170,6 +152,10 @@ $stmt->close();
         $hora_fin = !empty($p['hora_fin'])    ? substr($p['hora_fin'],0,5)    : null;
         $hora     = $hora_fin ? ($hora_ini.' - '.$hora_fin) : $hora_ini;
 
+        // start datetime robusto
+        $startStr = (!empty($p['r_fecha']) && !empty($p['hora_inicio'])) ? ($p['r_fecha'].' '.$p['hora_inicio']) : $p['fecha'];
+        $canStart = (new DateTimeImmutable('now')) >= new DateTimeImmutable($startStr);
+
         $ganadorTxt='-';
         if (!empty($p['ganador_id'])) {
           $ganadorTxt = ((int)$p['ganador_id']===(int)$p['jugador1_id']) ? ($p['jugador1_nombre'] ?: 'J1')
@@ -177,38 +163,39 @@ $stmt->close();
         }
         $cargado = (!empty($p['resultado']) && !empty($p['ganador_id']));
         $estadoPill = $cargado ? '<span class="pill pill-ok">Cargado</span>' : '<span class="pill pill-pend">Pendiente</span>';
-        $fechaYmd = date('Y-m-d', strtotime($p['fecha']));
+        $j1ok = !empty($p['jugador1_id']);
+        $j2ok = !empty($p['jugador2_id']);
+        $tieneJugadores = ($j1ok && $j2ok);
+
+        $puedeCargar = $tieneJugadores && $canStart;
+        $motivoLock = !$tieneJugadores ? 'Fixture pendiente'
+                     : (!$canStart ? 'Aún no inició' : '');
       ?>
         <tr>
           <td class="col-id"><?= (int)$p['partido_id'] ?></td>
           <td class="col-hora"><?= htmlspecialchars($hora) ?></td>
           <td class="col-cancha"><span class="truncate"><?= htmlspecialchars($p['cancha_nombre'] ?? '-') ?></span></td>
-          <td class="col-j1"><span class="truncate"><?= htmlspecialchars($p['jugador1_nombre'] ?? ('#'.$p['jugador1_id'])) ?></span></td>
-          <td class="col-j2"><span class="truncate"><?= htmlspecialchars($p['jugador2_nombre'] ?? ('#'.$p['jugador2_id'])) ?></span></td>
+          <td class="col-j1"><span class="truncate"><?= htmlspecialchars($p['jugador1_nombre'] ?? ($j1ok ? ('#'.$p['jugador1_id']) : 'Por definir')) ?></span></td>
+          <td class="col-j2"><span class="truncate"><?= htmlspecialchars($p['jugador2_nombre'] ?? ($j2ok ? ('#'.$p['jugador2_id']) : 'Por definir')) ?></span></td>
           <td class="col-res"><?= htmlspecialchars($p['resultado'] ?? '-') ?></td>
           <td class="col-gana"><span class="truncate"><?= htmlspecialchars($ganadorTxt) ?></span></td>
           <td class="col-estado"><?= $estadoPill ?></td>
           <td class="col-acc">
             <div class="action-buttons">
-              <?php if (!$cargado): ?>
-                <a class="btn-action edit" href="partidosForm.php?partido_id=<?= (int)$p['partido_id'] ?>">Cargar resultado</a>
-                <!-- Eliminar PARTIDO -->
-                <form method="POST" action="partidosAction.php"
-                      onsubmit="return confirm('¿Eliminar el partido #<?= (int)$p['partido_id'] ?>? Se quitará de la lista.');" style="display:inline-block">
-                  <input type="hidden" name="action" value="delete_match">
-                  <input type="hidden" name="partido_id" value="<?= (int)$p['partido_id'] ?>">
-                  <button type="submit" class="btn-action delete-hard">Eliminar</button>
-                </form>
-              <?php else: ?>
+              <?php if ($cargado): ?>
                 <a class="btn-action edit" href="partidosForm.php?partido_id=<?= (int)$p['partido_id'] ?>">Editar</a>
-                <!-- Eliminar PARTIDO -->
-                <form method="POST" action="partidosAction.php"
-                      onsubmit="return confirm('¿Eliminar el partido #<?= (int)$p['partido_id'] ?> por completo?');" style="display:inline-block">
-                  <input type="hidden" name="action" value="delete_match">
-                  <input type="hidden" name="partido_id" value="<?= (int)$p['partido_id'] ?>">
-                  <button type="submit" class="btn-action delete-hard">Eliminar</button>
-                </form>
+              <?php elseif (!$puedeCargar): ?>
+                <span class="btn-action edit disabled" title="<?= htmlspecialchars($motivoLock) ?>">Cargar resultado</span>
+              <?php else: ?>
+                <a class="btn-action edit" href="partidosForm.php?partido_id=<?= (int)$p['partido_id'] ?>">Cargar resultado</a>
               <?php endif; ?>
+
+              <form method="POST" action="partidosAction.php"
+                    onsubmit="return confirm('¿Eliminar el partido #<?= (int)$p['partido_id'] ?> por completo?');" style="display:inline-block">
+                <input type="hidden" name="action" value="delete_match">
+                <input type="hidden" name="partido_id" value="<?= (int)$p['partido_id'] ?>">
+                <button type="submit" class="btn-action delete-hard">Eliminar</button>
+              </form>
             </div>
           </td>
         </tr>

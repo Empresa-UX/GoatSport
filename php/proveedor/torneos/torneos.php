@@ -1,10 +1,6 @@
 <?php
 /* =========================================================================
  * Listado de torneos (Proveedor)
- * - Columnas: Nombre, Inicio, Fin, Estado (dinámico), Tipo, Capacidad, Puntos, Acciones
- * - Acciones: Participantes / Editar / Eliminar (si "en curso" -> solo "Cronograma de partidos")
- * - Filtros: nombre, estado, tipo, inicio(día/mes), fin(día/mes)
- * - Anchos por variables CSS (editables arriba)
  * ========================================================================= */
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
@@ -42,12 +38,28 @@ $sql = "
   SELECT
     t.torneo_id, t.nombre, t.fecha_inicio, t.fecha_fin, t.estado,
     t.tipo, t.capacidad, t.puntos_ganador, t.proveedor_id,
-    IF(p.torneo_id IS NULL, 0, 1) AS ya_programado
+    IF(p.torneo_id IS NULL, 0, 1) AS ya_programado,
+
+    COALESCE(pm.total,0)      AS partidos_total,
+    COALESCE(pm.jugados,0)    AS partidos_jugados,
+    COALESCE(pm.pendientes,0) AS partidos_pendientes
+
   FROM torneos t
   LEFT JOIN (
     SELECT DISTINCT torneo_id
     FROM partidos
   ) p ON p.torneo_id = t.torneo_id
+
+  LEFT JOIN (
+    SELECT
+      torneo_id,
+      COUNT(*) AS total,
+      SUM(CASE WHEN ganador_id IS NOT NULL AND resultado IS NOT NULL THEN 1 ELSE 0 END) AS jugados,
+      SUM(CASE WHEN ganador_id IS NULL OR resultado IS NULL THEN 1 ELSE 0 END) AS pendientes
+    FROM partidos
+    GROUP BY torneo_id
+  ) pm ON pm.torneo_id = t.torneo_id
+
   WHERE t.proveedor_id = ?
   ORDER BY t.fecha_inicio DESC, t.torneo_id DESC
 ";
@@ -59,18 +71,26 @@ $res = $stmt->get_result();
 $rows = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
 $stmt->close();
 
-/* Estado dinámico "en curso" según fechas */
+/* Estado dinámico */
 $hoy = date('Y-m-d');
 foreach ($rows as &$r) {
   $est = strtolower($r['estado'] ?? 'abierto');
-  if ($est !== 'finalizado') {
-    if ($r['fecha_inicio'] <= $hoy && $hoy <= $r['fecha_fin']) {
-      $r['estado_runtime'] = 'en curso';
-    } else {
-      $r['estado_runtime'] = $est;
-    }
-  } else {
+  $fi  = $r['fecha_inicio'] ?? null;
+  $ff  = $r['fecha_fin'] ?? null;
+
+  $total = (int)($r['partidos_total'] ?? 0);
+  $pend  = (int)($r['partidos_pendientes'] ?? 0);
+
+  if ($total > 0 && $pend === 0) {
     $r['estado_runtime'] = 'finalizado';
+  } elseif ($est === 'finalizado') {
+    $r['estado_runtime'] = 'finalizado';
+  } elseif ($ff && $hoy > $ff) {
+    $r['estado_runtime'] = 'finalizado';
+  } elseif ($fi && $ff && $fi <= $hoy && $hoy <= $ff) {
+    $r['estado_runtime'] = 'en curso';
+  } else {
+    $r['estado_runtime'] = $est;
   }
 }
 unset($r);
@@ -83,16 +103,13 @@ unset($r);
 
   <style>
     :root {
-      /* ==== Editá los anchos de columnas acá ==== */
       --col-nombre: 200px;
       --col-fecha: 60px;
-      --col-estado: 80px;
+      --col-estado: 90px;
       --col-tipo: 90px;
       --col-cap: 80px;
       --col-pts: 110px;
       --col-acc: 380px;
-      /* ========================================= */
-
       --brand: #0f766e;
     }
 
@@ -277,7 +294,7 @@ unset($r);
     .btn-add:hover {
       background: #139488;
     }
-    
+
     .btn-action {
       cursor: pointer;
       display: inline-flex;
@@ -324,6 +341,14 @@ unset($r);
       gap: 6px;
       flex-wrap: wrap;
       justify-content: center
+    }
+
+    .mini {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 700
     }
   </style>
 
@@ -391,7 +416,11 @@ unset($r);
           $tpCls = tipoClase($tipo);
           $txt = mb_strtolower(($r['nombre'] ?? ''), 'UTF-8');
           $enCurso = ($estado === 'en curso');
+          $finalizado = ($estado === 'finalizado');
           $yaProgramado = (int)($r['ya_programado'] ?? 0) === 1;
+
+          $total = (int)($r['partidos_total'] ?? 0);
+          $jugados = (int)($r['partidos_jugados'] ?? 0);
         ?>
           <tr
             data-text="<?= h($txt) ?>"
@@ -400,6 +429,9 @@ unset($r);
             data-i-dia="<?= $iDay ?>" data-i-mes="<?= $iMon ?>" data-f-dia="<?= $fDay ?>" data-f-mes="<?= $fMon ?>">
             <td class="col-nom">
               <div class="truncate"><strong><?= h($r['nombre']) ?></strong></div>
+              <?php if ($total > 0): ?>
+                <span class="mini"><?= $jugados ?>/<?= $total ?> partidos cargados</span>
+              <?php endif; ?>
             </td>
             <td class="col-fe"><?= h($ini) ?></td>
             <td class="col-fe"><?= h($fin) ?></td>
@@ -409,11 +441,22 @@ unset($r);
             <td class="col-pts"><?= (int)($r['puntos_ganador'] ?? 0) ?></td>
             <td class="col-acc">
               <div class="actions">
-                <?php if ($enCurso): ?>
+                <?php if ($enCurso || $finalizado): ?>
                   <button class="btn-action part"
                     onclick="location.href='torneoCronograma.php?torneo_id=<?= (int)$r['torneo_id'] ?>'">
-                    Cronograma de partidos
+                    <?= $finalizado ? 'Ver cronograma de partidos' : 'Cronograma de partidos' ?>
                   </button>
+
+                  <?php if ($finalizado): ?>
+                    <form method="POST" action="torneosAction.php"
+                      onsubmit="return confirm('¿Eliminar torneo?');"
+                      style="display:inline-block">
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="torneo_id" value="<?= (int)$r['torneo_id'] ?>">
+                      <button type="submit" class="btn-action delete">Eliminar</button>
+                    </form>
+                  <?php endif; ?>
+
                 <?php else: ?>
                   <button class="btn-action part"
                     onclick="location.href='torneoParticipantes.php?torneo_id=<?= (int)$r['torneo_id'] ?>'">
@@ -433,12 +476,10 @@ unset($r);
                     <button type="submit" class="btn-action delete">Eliminar</button>
                   </form>
 
-                  <!-- Nuevo: abre el wizard -->
-                <a class="btn-action plan"
-                  href="torneoProgramar.php?torneo_id=<?= (int)$r['torneo_id'] ?>">
-                  <?= $yaProgramado ? 'Reprogramar' : 'Programar' ?>
-                </a>
-
+                  <a class="btn-action plan"
+                    href="torneoProgramar.php?torneo_id=<?= (int)$r['torneo_id'] ?>">
+                    <?= $yaProgramado ? 'Reprogramar' : 'Programar' ?>
+                  </a>
                 <?php endif; ?>
               </div>
             </td>
