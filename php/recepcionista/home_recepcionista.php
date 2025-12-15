@@ -41,6 +41,15 @@ include __DIR__ . '/includes/sidebar.php';
         </div>
       </a>
 
+      <!-- Registrar reportes -->
+      <a href="/php/recepcionista/reportes/reportes.php" style="text-decoration:none;">
+        <div style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; cursor:pointer;">
+          <div style="font-size:40px; margin-bottom:10px;">📊</div>
+          <h3 style="color:#043b3d;">Registrar reportes</h3>
+          <p style="color:#666; font-size:14px;">Reporta quejas de clientes</p>
+        </div>
+      </a>
+
       <!-- Registrar resultado -->
       <a href="/php/recepcionista/partidos/partidos.php" style="text-decoration:none;">
         <div style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; cursor:pointer;">
