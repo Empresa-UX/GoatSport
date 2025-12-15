@@ -105,7 +105,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
     } else {
         $stmt->close();
-        $mensaje = "<p class='error'>⚠️ El correo no está registrado.</p>";
+        $mensaje = "<p class='error'>El correo no está registrado.</p>";
     }
 }
 ?>

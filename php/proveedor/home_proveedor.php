@@ -39,16 +39,6 @@ include 'includes/sidebar.php';
             </div>
         </a>
 
-        <!-- Calendario -->
-        <a href="./reservas/calendario.php" style="text-decoration:none;">
-            <div
-                style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; transition:0.2s ease; cursor:pointer;">
-                <div style="font-size:40px; margin-bottom:10px;">📅</div>
-                <h3 style="color:#043b3d;">Calendario</h3>
-                <p style="color:#666; font-size:14px;">Visualiza la ocupación por día y horario</p>
-            </div>
-        </a>
-
         <!-- Pagos -->
         <a href="./pagos/pagos.php" style="text-decoration:none;">
             <div
@@ -69,13 +59,13 @@ include 'includes/sidebar.php';
             </div>
         </a>
 
-        <!-- Notificaciones -->
-        <a href="./notificaciones/notificaciones.php" style="text-decoration:none;">
+        <!-- Reportes -->
+        <a href="./reportes/reportes.php" style="text-decoration:none;">
             <div
                 style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; transition:0.2s ease; cursor:pointer;">
-                <div style="font-size:40px; margin-bottom:10px;">🔔</div>
-                <h3 style="color:#043b3d;">Notificaciones</h3>
-                <p style="color:#666; font-size:14px;">Avisos por reportes, reservas y torneos</p>
+                <div style="font-size:40px; margin-bottom:10px;">📣</div>
+                <h3 style="color:#043b3d;">Reportes</h3>
+                <p style="color:#666; font-size:14px;">Ver quejas y sugerencias sobre tus canchas</p>
             </div>
         </a>
 
@@ -89,26 +79,6 @@ include 'includes/sidebar.php';
             </div>
         </a>
 
-        <!-- Reportes -->
-        <a href="./reportes/reportes.php" style="text-decoration:none;">
-            <div
-                style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; transition:0.2s ease; cursor:pointer;">
-                <div style="font-size:40px; margin-bottom:10px;">📣</div>
-                <h3 style="color:#043b3d;">Reportes</h3>
-                <p style="color:#666; font-size:14px;">Ver quejas y sugerencias sobre tus canchas</p>
-            </div>
-        </a>
-
-        <!-- Ranking -->
-        <a href="./ranking/ranking.php" style="text-decoration:none;">
-            <div
-                style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; transition:0.2s ease; cursor:pointer;">
-                <div style="font-size:40px; margin-bottom:10px;">🏆</div>
-                <h3 style="color:#043b3d;">Ranking</h3>
-                <p style="color:#666; font-size:14px;">Consultar el ranking de jugadores de tu club</p>
-            </div>
-        </a>
-
         <!-- Promociones -->
         <a href="./promociones/promociones.php" style="text-decoration:none;">
             <div
@@ -119,6 +89,15 @@ include 'includes/sidebar.php';
             </div>
         </a>
 
+        <!-- Notificaciones -->
+        <a href="./notificaciones/notificaciones.php" style="text-decoration:none;">
+            <div
+                style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; transition:0.2s ease; cursor:pointer;">
+                <div style="font-size:40px; margin-bottom:10px;">🔔</div>
+                <h3 style="color:#043b3d;">Notificaciones</h3>
+                <p style="color:#666; font-size:14px;">Avisos por reportes, reservas y torneos</p>
+            </div>
+        </a>
     </div>
 </div>
 

@@ -26,7 +26,7 @@ include __DIR__ . '/includes/sidebar.php';
       <!-- Reservas -->
       <a href="/php/recepcionista/reservas/reservas.php" style="text-decoration:none;">
         <div style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); padding:25px; cursor:pointer;">
-          <div style="font-size:40px; margin-bottom:10px;">🗓️</div>
+          <div style="font-size:40px; margin-bottom:10px;">🎾</div>
           <h3 style="color:#043b3d;">Reservas</h3>
           <p style="color:#666; font-size:14px;">Listado y gestión de reservas</p>
         </div>
