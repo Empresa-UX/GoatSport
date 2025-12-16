@@ -500,9 +500,3 @@
         gap: 10px;
     }
 }
-
-@media (min-width: 500px) {
-    .summary {
-        grid-template-columns: 1fr 1fr;
-    }
-}

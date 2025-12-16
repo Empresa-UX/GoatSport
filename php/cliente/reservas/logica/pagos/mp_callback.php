@@ -1,4 +1,7 @@
 <?php
+/* =========================================================================
+ * FILE: php/cliente/reservas/pagos/mp_callback.php
+ * ========================================================================= */
 declare(strict_types=1);
 require __DIR__ . '/../../../../config.php';
 require __DIR__ . '/../../../../../lib/util.php';
@@ -25,4 +28,5 @@ if ($status === 'success') {
 }
 
 echo "<div class='page-wrap'><p>El pago no fue aprobado (estado: ".h($status).").</p>
-      <p><a href='../../../../reservas_pago.php'>Volver a elegir método</a></p></div>";
+      <p><a href='../../steps/reservas_pago.php'>Volver a elegir método</a></p></div>";
+exit;

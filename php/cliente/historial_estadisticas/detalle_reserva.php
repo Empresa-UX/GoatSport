@@ -95,13 +95,19 @@ $sql_access = "
     SELECT 
         r.reserva_id, r.creador_id, r.fecha, r.hora_inicio, r.hora_fin, r.estado, r.tipo_reserva,
         COALESCE(NULLIF(r.precio_total, 0.00), c.precio) AS precio_mostrar,
-        c.cancha_id, c.nombre AS cancha_nombre, c.ubicacion, c.tipo
+        c.cancha_id,
+        c.nombre AS cancha_nombre,
+        c.tipo,
+        TRIM(CONCAT_WS(', ', pd.direccion, pd.barrio, pd.ciudad)) AS ubicacion
     FROM reservas r
-    JOIN canchas c ON c.cancha_id=r.cancha_id
-    LEFT JOIN participaciones p ON p.reserva_id=r.reserva_id AND p.jugador_id=?
-    WHERE r.reserva_id=? AND (r.creador_id=? OR p.jugador_id IS NOT NULL)
+    JOIN canchas c ON c.cancha_id = r.cancha_id
+    LEFT JOIN proveedores_detalle pd ON pd.proveedor_id = c.proveedor_id
+    LEFT JOIN participaciones p ON p.reserva_id = r.reserva_id AND p.jugador_id = ?
+    WHERE r.reserva_id = ? AND (r.creador_id = ? OR p.jugador_id IS NOT NULL)
     LIMIT 1
 ";
+
+
 $st = $conn->prepare($sql_access);
 $st->bind_param("iii", $userId, $reservaId, $userId);
 $st->execute();

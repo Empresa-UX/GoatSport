@@ -86,7 +86,8 @@ $sql_rows = "
     SELECT 
         r.reserva_id, r.fecha, r.hora_inicio, r.hora_fin, r.estado, r.tipo_reserva,
         COALESCE(NULLIF(r.precio_total, 0.00), c.precio) AS precio_mostrar,
-        c.cancha_id, c.nombre AS cancha_nombre, c.ubicacion, c.proveedor_id,
+      c.cancha_id, c.nombre AS cancha_nombre, c.proveedor_id,
+      TRIM(CONCAT_WS(', ', pd.direccion, pd.barrio, pd.ciudad)) AS ubicacion,
         COALESCE(pd.nombre_club, CONCAT('Club #', c.proveedor_id)) AS club_nombre,
         $estadoPagoCase AS estado_pago,
         COALESCE(pay.metodo_ult, '—') AS metodo_pago

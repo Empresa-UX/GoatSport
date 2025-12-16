@@ -1,6 +1,8 @@
 <?php
+/* =========================================================================
+ * FILE: php/cliente/reservas/pagos/tarjeta.php
+ * ========================================================================= */
 declare(strict_types=1);
-// estás en /php/cliente/reservas/logica/pagos/
 require __DIR__ . '/../../../../config.php';
 require __DIR__ . '/../../../../../lib/util.php';
 require __DIR__ . '/../../../../../config.mercadopago.php';

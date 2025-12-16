@@ -1,4 +1,7 @@
 <?php
+/* =========================================================================
+ * FILE: php/cliente/reservas/steps/reservas_confirmacion.php
+ * ========================================================================= */
 require __DIR__ . '/../../../config.php';
 include './../../includes/header.php';
 require __DIR__ . '/../../../../lib/util.php';
