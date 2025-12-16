@@ -1,6 +1,6 @@
 <?php
 /* =========================================================================
- * FILE: php/cliente/reservas/steps/reservas.php  (REEMPLAZO COMPLETO)
+ * FILE: php/cliente/reservas/steps/reservas.php  (REEMPLAZO COMPLETO - CORREGIDO)
  * ========================================================================= */
 include './../../includes/header.php';
 include './../../../config.php';
@@ -36,7 +36,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'clientes') {
   if ($q === '') { echo json_encode($out); exit; }
 
   $qName = $q . '%';
-  $qEmailPrefix = $q . '%@gmail.com';
+
+  // ✅ FIX: si el usuario ya escribió "@", NO concatenamos "@gmail.com" de nuevo
+  if (strpos($q, '@') !== false) {
+    $qEmailPrefix = $q . '%';
+  } else {
+    $qEmailPrefix = $q . '%@gmail.com';
+  }
 
   $sql = "
     SELECT user_id, nombre, email
@@ -249,6 +255,16 @@ for (; $t <= $viewEnd; $t += 60) $labels[] = $t;
 
   .row-3{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap:10px; }
   .row-3.paywide{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
+
+  /* ✅ FIX: row-2 para Nombre/Apellido en la misma fila */
+  .row-2{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:10px;
+  }
+  @media (max-width:420px){
+    .row-2{ grid-template-columns:1fr; }
+  }
 
   .chkline{ display:flex; align-items:center; gap:10px; padding:10px 13px; border:1px solid #e1ecec; border-radius:10px; background:#fff; }
   .chkline input{ transform:scale(1.05); width:20px; margin-bottom: 0px}
@@ -581,8 +597,6 @@ for (; $t <= $viewEnd; $t += 60) $labels[] = $t;
             <button type="button" class="btn-invite">Invitar por email</button>
           </div>
         </div>
-
-        <small class="muted">Escribí nombre o prefijo del email. Solo @gmail.com.</small>
       </div>
     `;
 
@@ -639,13 +653,42 @@ for (; $t <= $viewEnd; $t += 60) $labels[] = $t;
       mailtoInvite(v);
     });
 
+    // ✅ FIX: verificar existencia también mientras escribe (y no solo con blur)
     let acT = null, lastQ = '';
+    let verifyT = null;
+
+    function verifyEmailExists(addr){
+      const v = (addr || '').trim();
+      showInviteCTA(false);
+
+      if (!/^.+@gmail\.com$/i.test(v)) {
+        email.removeAttribute('data-valid');
+        return;
+      }
+
+      fetch(`<?= basename(__FILE__) ?>?ajax=clientes&email=${encodeURIComponent(v)}`, {cache:'no-store'})
+        .then(r=>r.json()).then(j=>{
+          if (j && j.ok && j.exists) {
+            email.setAttribute('data-valid','1');
+            showInviteCTA(false);
+          } else {
+            email.removeAttribute('data-valid');
+            showInviteCTA(true);
+          }
+        }).catch(()=>{
+          email.removeAttribute('data-valid');
+          showInviteCTA(true);
+        });
+    }
+
     email.addEventListener('input', (e)=>{
       const q = e.target.value.trim();
       email.removeAttribute('data-valid');
       showInviteCTA(false);
       if (q === '') { closeAC(email); return; }
       if (!/^[\w.\-+@]*$/i.test(q)) return;
+
+      // Autocomplete
       clearTimeout(acT);
       acT = setTimeout(()=>{
         lastQ = q;
@@ -669,25 +712,14 @@ for (; $t <= $viewEnd; $t += 60) $labels[] = $t;
             });
           }).catch(()=>{});
       }, 220);
+
+      // Verificación directa (si ya parece email completo)
+      clearTimeout(verifyT);
+      verifyT = setTimeout(()=> verifyEmailExists(q), 350);
     });
 
     email.addEventListener('blur', ()=>{
-      const v = email.value.trim();
-      showInviteCTA(false);
-      if (!/^.+@gmail\.com$/i.test(v)) { email.removeAttribute('data-valid'); return; }
-      fetch(`<?= basename(__FILE__) ?>?ajax=clientes&email=${encodeURIComponent(v)}`, {cache:'no-store'})
-        .then(r=>r.json()).then(j=>{
-          if (j && j.ok && j.exists) {
-            email.setAttribute('data-valid','1');
-            showInviteCTA(false);
-          } else {
-            email.removeAttribute('data-valid');
-            showInviteCTA(true);
-          }
-        }).catch(()=>{
-          email.removeAttribute('data-valid');
-          showInviteCTA(true);
-        });
+      verifyEmailExists(email.value);
       setTimeout(()=>closeAC(email), 150);
     });
 
@@ -869,6 +901,21 @@ for (; $t <= $viewEnd; $t += 60) $labels[] = $t;
     el.addEventListener('change', ()=>{ validateTimes(); autoPrice(); });
   });
 
+  // ✅ helper: verificación SINCRÓNICA de existencia (solo para el caso borde de submit inmediato)
+  function syncEmailExists(addr){
+    try{
+      const url = `<?= basename(__FILE__) ?>?ajax=clientes&email=${encodeURIComponent(addr)}`;
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, false); // sync
+      xhr.send(null);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const j = JSON.parse(xhr.responseText || '{}');
+        return !!(j && j.ok && j.exists);
+      }
+    }catch(e){}
+    return false;
+  }
+
   window.validar = function(){
     if (!validateTimes()){ alert('Revisá los horarios.'); return false; }
     if (!fechaInp.value){ alert('Elegí una fecha.'); return false; }
@@ -883,14 +930,10 @@ for (; $t <= $viewEnd; $t += 60) $labels[] = $t;
           const l = (c.querySelector('.last')?.value || '').trim();
           if (!f || !l){ alert(`Completar nombre y apellido en Persona ${idx}.`); return false; }
         } else {
-          const email = (c.querySelector('.email')?.value || '').trim();
+          const emailEl = c.querySelector('.email');
+          const email = (emailEl?.value || '').trim();
           const okDomain = /@gmail\.com$/i.test(email);
-          const validFlag = c.querySelector('.email')?.getAttribute('data-valid') === '1';
-          if (!email || !okDomain || !validFlag){
-            alert(`Elegí un email válido de la lista (@gmail.com) en Persona ${idx}. Si no está registrado, usá "Invitar por email" y que se registre antes.`);
-            return false;
           }
-        }
         idx++;
       }
     }

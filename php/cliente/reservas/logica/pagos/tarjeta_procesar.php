@@ -1,126 +1,170 @@
 <?php
 /* =========================================================================
- * FILE: php/cliente/reservas/pagos/tarjeta_procesar.php
+ * FILE: php/cliente/reservas/logica/pagos/tarjeta_procesar.php
  * ========================================================================= */
 declare(strict_types=1);
+
 require __DIR__ . '/../../../../config.php';
 require __DIR__ . '/../../../../../lib/util.php';
 require __DIR__ . '/../../../../../config.mercadopago.php';
+
 ensure_session();
 header('Content-Type: application/json; charset=utf-8');
 
-// DEMO: aprobar siempre para ver el flujo end-to-end
-if (defined('MP_DEMO_FORCE_APPROVED') && MP_DEMO_FORCE_APPROVED === true) {
-  $reserva = $_SESSION['reserva'] ?? null;
-  if (!$reserva) { http_response_code(400); echo json_encode(['error'=>'Reserva no encontrada']); exit; }
-
-  $canchaId = (int)$reserva['cancha_id']; $monto = 0.0;
-  if ($stmt = $conn->prepare("SELECT precio FROM canchas WHERE cancha_id = ?")) {
-    $stmt->bind_param("i",$canchaId); $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
-    $monto = (float)($row['precio'] ?? 0);
-  }
-
-  $_SESSION['pago'] = [
-    'metodo'     => 'tarjeta',
-    'estado'     => 'pagado',
-    'monto'      => $monto,
-    'fecha_pago' => date('Y-m-d H:i:s'),
-    'payment_id' => 'DEMO-'.bin2hex(random_bytes(6)),
-  ];
-  echo json_encode(['ok'=>true,'demo'=>true]); exit;
+$reserva = $_SESSION['reserva'] ?? null;
+if (!is_array($reserva) || empty($reserva['cancha_id']) || empty($reserva['fecha']) || empty($reserva['hora_inicio'])) {
+  http_response_code(400);
+  echo json_encode(['error' => 'Reserva no encontrada o incompleta']);
+  exit;
 }
 
-// ======= REAL (cuando quites DEMO) =======
-// Logs en /php/logs
-$logDir = __DIR__ . '/../../../../logs';
-if (!is_dir($logDir)) { @mkdir($logDir, 0775, true); }
-$logFile = $logDir.'/mp_card_payments.log';
-$log = function(string $msg, array $ctx = []) use ($logFile) {
-  @file_put_contents($logFile, date('c')." $msg ".json_encode($ctx, JSON_UNESCAPED_UNICODE).PHP_EOL, FILE_APPEND);
-};
+$splitPlan = $reserva['split_plan'] ?? ['enabled' => false];
+$precioFinal = (float)($reserva['precio_final'] ?? 0);
+
+$monto = (float)(
+  !empty($splitPlan['enabled'])
+    ? (float)($splitPlan['creator_amount'] ?? $precioFinal)
+    : $precioFinal
+);
+$monto = round($monto, 2);
+
+if ($monto <= 0) {
+  http_response_code(400);
+  echo json_encode(['error' => 'Monto inválido']);
+  exit;
+}
+
+/* ====================== DEMO ====================== */
+if (defined('MP_DEMO_FORCE_APPROVED') && MP_DEMO_FORCE_APPROVED === true) {
+  $_SESSION['gateway_hint'] = [
+    'gateway' => 'tarjeta_demo',
+    'status'  => 'approved',
+    'payment_id' => 'DEMO-' . bin2hex(random_bytes(6)),
+    'amount' => $monto,
+    'external_reference' => 'DEMO-' . bin2hex(random_bytes(4)),
+    'at' => date('c'),
+  ];
+  echo json_encode(['ok' => true, 'demo' => true]);
+  exit;
+}
+
+/* ====================== REAL ====================== */
+if (!defined('MP_ACCESS_TOKEN') || !MP_ACCESS_TOKEN) {
+  http_response_code(500);
+  echo json_encode(['error' => 'MP_ACCESS_TOKEN no configurado']);
+  exit;
+}
 
 $raw = file_get_contents('php://input');
 $body = json_decode($raw, true);
-if (!is_array($body)) { http_response_code(400); echo json_encode(['error'=>'Payload no JSON']); exit; }
+if (!is_array($body)) {
+  http_response_code(400);
+  echo json_encode(['error' => 'Payload no JSON']);
+  exit;
+}
 
 $card = $body['cardFormData'] ?? null;
-if (!$card) { http_response_code(400); echo json_encode(['error'=>'cardFormData faltante']); exit; }
+if (!is_array($card)) {
+  http_response_code(400);
+  echo json_encode(['error' => 'cardFormData faltante']);
+  exit;
+}
 
-$token       = (string)($card['token'] ?? '');
-$pmid        = (string)($card['payment_method_id'] ?? '');
-$issuerId    = $card['issuer_id'] ?? ($card['issuer']['id'] ?? null);
-$installments= (int)($card['installments'] ?? 1);
-$payerEmail  = (string)($card['payer']['email'] ?? 'comprador@example.com');
+$token        = (string)($card['token'] ?? '');
+$pmid         = (string)($card['payment_method_id'] ?? '');
+$issuerId     = $card['issuer_id'] ?? ($card['issuer']['id'] ?? null);
+$installments = (int)($card['installments'] ?? 1);
+
+$payerEmail = (string)($card['payer']['email'] ?? '');
+if ($payerEmail === '') $payerEmail = 'cliente@example.com';
+
 $idType      = strtoupper(trim((string)($card['payer']['identification']['type'] ?? 'DNI')));
 $idNumberRaw = (string)($card['payer']['identification']['number'] ?? '12345678');
 $idNumber    = preg_replace('/\D+/', '', $idNumberRaw) ?: '12345678';
-$holderName  = (string)($card['cardholder']['name'] ?? '');
 
-if (!$token || !$pmid) { http_response_code(400); echo json_encode(['error'=>'Faltan token o payment_method_id']); exit; }
-if (!MP_ACCESS_TOKEN)  { http_response_code(500); echo json_encode(['error'=>'MP_ACCESS_TOKEN no configurado']); exit; }
+$holderName  = trim((string)($card['cardholder']['name'] ?? ''));
 
-$reserva = $_SESSION['reserva'] ?? null;
-if (!$reserva) { http_response_code(400); echo json_encode(['error'=>'Reserva no encontrada en sesión']); exit; }
+if ($token === '' || $pmid === '') {
+  http_response_code(400);
+  echo json_encode(['error' => 'Faltan token o payment_method_id']);
+  exit;
+}
+if ($installments < 1) $installments = 1;
 
 $canchaId = (int)$reserva['cancha_id'];
-$monto = 0.0;
-if ($stmt = $conn->prepare("SELECT precio FROM canchas WHERE cancha_id = ?")) {
-  $stmt->bind_param("i",$canchaId); $stmt->execute();
-  $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
-  $monto = (float)($row['precio'] ?? 0);
+$fecha    = (string)$reserva['fecha'];
+$hora     = (string)$reserva['hora_inicio'];
+
+$externalRef = 'PAYCARD-' . $canchaId . '-' . $fecha . '-' . $hora . '-' . bin2hex(random_bytes(4));
+
+$first = '';
+$last  = '';
+if ($holderName !== '') {
+  $parts = preg_split('/\s+/', $holderName);
+  $first = $parts[0] ?? '';
+  $last  = trim(substr($holderName, strlen($first)));
 }
-if ($monto <= 0) { http_response_code(400); echo json_encode(['error'=>'Monto inválido']); exit; }
 
-$externalRef = 'RES-'.$reserva['cancha_id'].'-'.$reserva['fecha'].'-'.$reserva['hora_inicio'];
-
-// USAR mp_api_post() DE lib/util.php (NO redefinirla aquí)
 $payload = [
   "transaction_amount" => (float)$monto,
   "token"              => $token,
-  "description"        => "Reserva cancha ".$reserva['cancha_id']." ".$reserva['fecha']." ".$reserva['hora_inicio'],
+  "description"        => "Pago reserva cancha {$canchaId} {$fecha} {$hora}",
   "installments"       => $installments,
   "payment_method_id"  => $pmid,
   "payer" => [
     "email" => $payerEmail,
-    "identification" => [ "type" => $idType ?: "DNI", "number" => $idNumber ],
-    "first_name" => explode(' ', $holderName)[0] ?? '',
-    "last_name"  => trim(substr($holderName, strlen(explode(' ', $holderName)[0] ?? ''))) ?: '',
+    "identification" => [
+      "type"   => $idType ?: "DNI",
+      "number" => $idNumber
+    ],
+    "first_name" => $first,
+    "last_name"  => $last,
   ],
   "binary_mode" => true,
-  "external_reference" => $externalRef
+  "external_reference" => $externalRef,
 ];
-if ($issuerId) { $payload["issuer_id"] = (int)$issuerId; }
 
-$idem = 'idem-'.bin2hex(random_bytes(16));
-$log('REQUEST /v1/payments', ['payload'=>$payload]);
+if (!empty($issuerId)) {
+  $payload["issuer_id"] = (int)$issuerId;
+}
 
-$res = mp_api_post('/v1/payments', $payload, ['X-Idempotency-Key: '.$idem]); // <-- de util.php
-$log('RESPONSE /v1/payments', ['http'=>$res['http'] ?? 0, 'raw'=>$res['raw'] ?? ($res['error'] ?? null)]);
+/**
+ * ✅ Idempotency estable por sesión (si recargan / reintentan no duplica cobro).
+ * Si querés 1 idempotency por intento, guardalo con timestamp y regeneralo sólo cuando cambie el monto.
+ */
+if (empty($_SESSION['mp_card_idem'])) {
+  $_SESSION['mp_card_idem'] = 'idem-card-' . bin2hex(random_bytes(16));
+}
+$idem = (string)$_SESSION['mp_card_idem'];
+
+$res = mp_api_post('/v1/payments', $payload, ['X-Idempotency-Key: ' . $idem]);
 
 if (!($res['ok'] ?? false)) {
   http_response_code($res['http'] ?? 500);
-  echo json_encode(['error'=>'MP HTTP', 'detail'=>$res['raw'] ?? ($res['error'] ?? 'unknown')]); exit;
+  echo json_encode([
+    'error'  => 'MP HTTP',
+    'detail' => $res['raw'] ?? ($res['error'] ?? 'unknown'),
+  ]);
+  exit;
 }
 
-$status = $res['body']['status'] ?? 'in_process';
+$status     = (string)($res['body']['status'] ?? 'in_process');
 $payment_id = $res['body']['id'] ?? null;
 
-if ($status === 'approved') {
-  $_SESSION['pago'] = [
-    'metodo'     => 'tarjeta',
-    'estado'     => 'pagado',
-    'monto'      => $monto,
-    'fecha_pago' => date('Y-m-d H:i:s'),
-    'payment_id' => $payment_id,
-  ];
-  echo json_encode(['ok'=>true,'payment_id'=>$payment_id]); exit;
-}
-
-http_response_code(402);
-echo json_encode([
-  'error'  => 'Estado: '.$status,
-  'status' => $status,
+/**
+ * Importante:
+ * - Aunque venga "approved", vos dijiste que con tarjeta queda "pendiente" (verificación humana).
+ * - Yo NO lo fuerzo acá porque depende de tu lógica en reservas_confirmacion.php.
+ *   Si vos querés forzarlo, acá podés mapear approved -> in_process/pending_manual.
+ */
+$_SESSION['gateway_hint'] = [
+  'gateway' => 'tarjeta',
+  'status'  => $status,
   'payment_id' => $payment_id,
-  'mp' => $res['body'] ?? null
-]);
+  'external_reference' => $externalRef,
+  'amount' => $monto,
+  'at' => date('c'),
+];
+
+echo json_encode(['ok' => true, 'payment_id' => $payment_id, 'status' => $status]);
+exit;
