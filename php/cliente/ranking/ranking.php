@@ -6,7 +6,7 @@ include './../../config.php';
 include './../includes/header.php';
 
 $userId   = (int)$_SESSION['usuario_id'];
-$pageSize = 10;
+$pageSize = 6;
 $page     = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset   = ($page - 1) * $pageSize;
 $q        = isset($_GET['q']) ? trim($_GET['q']) : '';
