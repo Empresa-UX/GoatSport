@@ -3,6 +3,7 @@
  * Programar partidos (Proveedor) — Manual Partido 1..N
  * (UI limpia + anchos configurables por CSS variables; LÓGICA INTACTA)
  * + Reprogramar: precarga datos si ya existen partidos y al guardar reemplaza programación
+ * + VALIDACIÓN NUEVA: orden cronológico (Partido k NO puede ser anterior a Partido k-1)
  * ========================================================================= */
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
@@ -123,7 +124,7 @@ if ($esReprogramar) {
 $errors = [];
 $warns  = [];
 
-/* ====== POST: guardar programación (LÓGICA INTACTA) ====== */
+/* ====== POST: guardar programación (LÓGICA INTACTA + ORDEN CRONOLÓGICO) ====== */
 if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='guardar_programacion') {
 
   if (!$canchas) $errors[] = "No tenés canchas activas/aprobadas.";
@@ -137,6 +138,9 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
 
   $fi = $torneo['fecha_inicio']; $ff = $torneo['fecha_fin'];
 
+  // Guardamos timestamps de inicio por partido para validar orden al final
+  $startsTs = [];
+
   foreach ($partidosList as $row) {
     $k = $row['k'];
     $cid = (int)($sel_cancha[$k] ?? 0);
@@ -147,6 +151,14 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
     if (!$f)     { $errors[] = "Partido {$k}: fecha requerida."; continue; }
     if ($f < $fi || $f > $ff) { $errors[] = "Partido {$k}: fecha fuera del rango del torneo."; continue; }
     if (!$hi)    { $errors[] = "Partido {$k}: hora desde requerida."; continue; }
+
+    // timestamp inicio (para orden cronológico)
+    $tsIni = strtotime($f.' '.$hi);
+    if ($tsIni === false) {
+      $errors[] = "Partido {$k}: fecha/hora inválida.";
+      continue;
+    }
+    $startsTs[(int)$k] = $tsIni;
 
     // fin = +60'
     $hf_ts = strtotime($hi)+MATCH_MINUTES*60;
@@ -169,6 +181,17 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
     if (!cancha_slot_libre($conn, $cid, $f, $hi_full, $hf_full)) {
       $errors[] = "Partido {$k}: la cancha/hora seleccionada está ocupada.";
       continue;
+    }
+  }
+
+  // ====== VALIDACIÓN NUEVA: Partido k debe ser >= Partido k-1 (fecha/hora) ======
+  if (!$errors) {
+    $total = count($partidosList);
+    for ($k=2; $k<=$total; $k++){
+      if (!isset($startsTs[$k-1]) || !isset($startsTs[$k])) continue; // si ya hubo error arriba, no duplicamos
+      if ($startsTs[$k] < $startsTs[$k-1]) {
+        $errors[] = "Orden inválido: Partido {$k} no puede ser anterior al Partido ".($k-1).".";
+      }
     }
   }
 
@@ -311,10 +334,9 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
       font-size: 16px;
       transition: 0.2s ease;
   }
-   .actions-2 .btn:hover {
+  .actions-2col .btn:hover {
       background: #139488;
-
-    }
+  }
 
   .btn-primary{background:var(--brand);color:var(--brand-ink)}
   .btn-primary:disabled{opacity:.55;cursor:not-allowed;filter:grayscale(.15)}
@@ -388,7 +410,10 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
   const btnGuardar = document.getElementById('btnGuardarProg');
   if (!form || !btnGuardar) return;
 
+  const TOTAL = <?= (int)count($partidosList) ?>;
+
   // Habilitar SOLO cuando TODOS los campos requeridos estén completos (en TODAS las filas)
+  // + y además el orden cronológico sea válido (k >= k-1)
   const requiredFields = () => Array.from(form.querySelectorAll('[data-required="1"]'));
 
   function isFilled(el){
@@ -397,10 +422,29 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
     return v !== '' && v !== '0';
   }
 
+  function getStartTs(k){
+    const fecha = form.querySelector(`input[name="fecha[${k}]"]`)?.value || '';
+    const hini  = form.querySelector(`input[name="hora_ini[${k}]"]`)?.value || '';
+    if (!fecha || !hini) return null;
+    const ts = Date.parse(`${fecha}T${hini}:00`);
+    return Number.isFinite(ts) ? ts : null;
+  }
+
+  function isChronologicalOk(){
+    for (let k=2; k<=TOTAL; k++){
+      const prev = getStartTs(k-1);
+      const curr = getStartTs(k);
+      if (prev === null || curr === null) return true; // si falta algo, lo maneja "filled"
+      if (curr < prev) return false;
+    }
+    return true;
+  }
+
   function validateAll(){
     const fields = requiredFields();
-    const ok = fields.length > 0 && fields.every(isFilled);
-    btnGuardar.disabled = !ok;
+    const okFilled = fields.length > 0 && fields.every(isFilled);
+    const okChrono = okFilled ? isChronologicalOk() : false;
+    btnGuardar.disabled = !(okFilled && okChrono);
   }
 
   // estado inicial
@@ -413,7 +457,7 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
     if (e.target && e.target.matches('[data-required="1"]')) validateAll();
   });
 
-  // Tu validación submit (intacta). Solo agrego un guard extra por seguridad.
+  // Tu validación submit (intacta) + agrego orden cronológico
   form.addEventListener('submit', function(e){
     if (btnGuardar.disabled) { e.preventDefault(); return; }
 
@@ -421,6 +465,7 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
     const fi = new Date('<?= h($torneo['fecha_inicio']) ?>T00:00:00');
     const ff = new Date('<?= h($torneo['fecha_fin']) ?>T23:59:59');
 
+    // Validaciones existentes
     <?php foreach ($partidosList as $row): $k=$row['k']; ?>
       (function(){
         const cancha = form.querySelector('select[name="cancha[<?= $k ?>]"]')?.value || '';
@@ -436,6 +481,16 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && ($_POST['action']??'')==='gu
         }
       })();
     <?php endforeach; ?>
+
+    // Validación NUEVA: orden cronológico
+    for (let k=2; k<=TOTAL; k++){
+      const prevTs = getStartTs(k-1);
+      const currTs = getStartTs(k);
+      if (prevTs !== null && currTs !== null && currTs < prevTs){
+        errs.push(`Orden inválido: Partido ${k} no puede ser anterior al Partido ${k-1}.`);
+        break; // con 1 alcanza para no spamear
+      }
+    }
 
     if (errs.length){
       e.preventDefault();

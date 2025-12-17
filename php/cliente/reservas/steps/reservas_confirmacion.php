@@ -44,8 +44,8 @@ $tipoReserva = (string)($reserva['tipo_reserva'] ?? 'equipo');
 $splitPlan   = $reserva['split_plan'] ?? ['enabled' => false];
 $metodoPost  = (string)($_POST['metodo'] ?? 'club');
 
-if ($canchaId <= 0 || !$fecha || !$horaInicio || $duracion <= 0) {
-  echo "<div class='page-wrap'><p>Error: faltan datos de la reserva (cancha/fecha/hora/duración).</p></div>";
+if ($canchaId <= 0 || !$fecha || !$horaInicio || $duracion <= 0 || $precioFinal <= 0) {
+  echo "<div class='page-wrap'><p>Error: faltan datos de la reserva (cancha/fecha/hora/duración/precio).</p></div>";
   include './../../includes/footer.php';
   exit;
 }
@@ -62,37 +62,48 @@ $canchaNombre = "Cancha #$canchaId";
 if ($stmt = $conn->prepare("SELECT nombre FROM canchas WHERE cancha_id = ?")) {
   $stmt->bind_param("i", $canchaId);
   $stmt->execute();
-  if ($row = $stmt->get_result()->fetch_assoc()) $canchaNombre = (string)$row['nombre'];
+  if ($row = $stmt->get_result()->fetch_assoc()) {
+    $canchaNombre = (string)($row['nombre'] ?? $canchaNombre);
+  }
   $stmt->close();
 }
 
-/**
- * REGLAS (según lo que pediste):
- * - reserva.estado SIEMPRE 'confirmada' (si no hay conflictos)
- * - pagos.estado SIEMPRE 'pendiente'
- * - pagos.fecha_pago:
- *     - se setea HOY si el pago fue efectivamente realizado (tarjeta approved / mp success / club)
- *     - si no, NULL
- */
-$estadoReserva = 'confirmada'; // ✅ SIEMPRE confirmada
+/* =========================================================
+   REGLAS:
+   - Reserva SIEMPRE confirmada (si no hay conflictos)
+   - Pagos: 1 sola fila (del creador)
+     - pagos.monto = TOTAL real de la reserva (precioFinal)
+     - pagos.detalle = SOLO nombres separados por coma (si está dividido), sino NULL
+   - pagos.estado SIEMPRE 'pendiente'
+   - pagos.fecha_pago = HOY si el pago se efectuó (tarjeta/MP/club), sino NULL
+   ========================================================= */
 
+$estadoReserva = 'confirmada';
 $metodoEnum = metodo_to_enum($metodoPost);
 
-// Datos gateway (solo referencia / detalle)
+// Total real de la reserva (con promo aplicada) => DB pagos.monto
+$montoTotalReserva = round($precioFinal, 2);
+
+// Monto cobrado al jugador (lo que paga "ahora" por el flujo)
+$montoCobradoJugador = $montoTotalReserva;
+if (!empty($splitPlan['enabled'])) {
+  $montoCobradoJugador = round((float)($splitPlan['creator_amount'] ?? $montoTotalReserva), 2);
+}
+
+// Datos gateway
 $gateway = $_SESSION['gateway_hint'] ?? [];
 $refGateway = isset($gateway['payment_id']) ? (string)$gateway['payment_id'] : null;
-$detalle = $gateway ? json_encode($gateway, JSON_UNESCAPED_UNICODE) : null;
 
-// Fecha pago (solo cuando el pago fue "efectuado")
+// Fecha pago (solo cuando se efectuó)
 $now = date('Y-m-d H:i:s');
 $fechaPago = null;
 
-// Club: consideramos que el pago se efectuó (si NO querés esto, cambiá a: $fechaPago = null;)
+// Club: lo consideramos "efectuado" en este flujo (si NO querés esto, comentá estas 2 líneas)
 if ($metodoEnum === 'club') {
   $fechaPago = $now;
 }
 
-// Tarjeta: si MP status approved
+// Tarjeta: si gateway status approved
 if ($metodoEnum === 'tarjeta') {
   $st = (string)($gateway['status'] ?? '');
   if ($st === 'approved') {
@@ -104,19 +115,70 @@ if ($metodoEnum === 'tarjeta') {
 if ($metodoEnum === 'mercado_pago') {
   $hint = $_SESSION['mp_callback_hint'] ?? null;
   $statusCb = is_array($hint) ? (string)($hint['status'] ?? '') : '';
+
   if ($statusCb === 'success') {
     $fechaPago = $now;
-    if (!empty($hint['payment_id'])) $refGateway = (string)$hint['payment_id'];
-    $detalle = json_encode(['mp_callback' => $hint, 'at' => $now], JSON_UNESCAPED_UNICODE);
+    if (is_array($hint) && !empty($hint['payment_id'])) {
+      $refGateway = (string)$hint['payment_id'];
+    }
   }
 
   $p = $_SESSION['pago'] ?? null;
   if (is_array($p) && (($p['estado'] ?? '') === 'pagado')) {
     $fechaPago = (string)($p['fecha_pago'] ?? $now);
     if (!empty($p['payment_id'])) $refGateway = (string)$p['payment_id'];
-    $detalle = json_encode($p, JSON_UNESCAPED_UNICODE);
   }
 }
+
+/* =========================================================
+   DIVIDIDO EN:
+   - 2 variables:
+     - $divididoEnDb: lo que guardo en BD (solo nombres, coma)
+     - $divididoEnUi: lo que muestro en UI (solo nombres, coma)
+   ========================================================= */
+$divididoEnDb = null;
+$divididoEnUi = null;
+
+if (!empty($splitPlan['enabled'])) {
+  $nombres = [];
+
+  foreach (($splitPlan['participants'] ?? []) as $p) {
+
+    // Invitados
+    if (($p['mode'] ?? '') === 'inv') {
+      $full = trim((string)($p['first'] ?? '') . ' ' . (string)($p['last'] ?? ''));
+      if ($full !== '') $nombres[] = $full;
+      continue;
+    }
+
+    // Registrados: buscar nombre real por user_id
+    if (($p['mode'] ?? '') === 'reg') {
+      $pid = (int)($p['user_id'] ?? 0);
+      if ($pid > 0) {
+        $nm = '';
+        if ($st = $conn->prepare("SELECT nombre FROM usuarios WHERE user_id=? LIMIT 1")) {
+          $st->bind_param("i", $pid);
+          $st->execute();
+          $nm = (string)($st->get_result()->fetch_assoc()['nombre'] ?? '');
+          $st->close();
+        }
+        $nm = trim($nm);
+        if ($nm !== '') {
+          $nombres[] = $nm;
+        }
+      }
+    }
+  }
+
+  $nombres = array_values(array_unique(array_filter(array_map('trim', $nombres))));
+  if (!empty($nombres)) {
+    $divididoEnDb = implode(', ', $nombres); // ✅ solo nombres
+    $divididoEnUi = $divididoEnDb;           // ✅ mismo texto para UI
+  }
+}
+
+// Lo que va a BD en pagos.detalle (solo nombres si dividido, si no NULL)
+$detalle = $divididoEnDb;
 
 $insertedId = null;
 $errorMsg = null;
@@ -142,7 +204,7 @@ try {
     $errorMsg = "Lo sentimos, el horario seleccionado ya fue reservado por otro usuario.";
   } else {
 
-    // Insert reserva (siempre confirmada)
+    // Insert reserva (SIEMPRE confirmada)
     $ins = $conn->prepare("
       INSERT INTO reservas (cancha_id, creador_id, fecha, hora_inicio, hora_fin, precio_total, tipo_reserva, estado)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -152,7 +214,7 @@ try {
     $insertedId = (int)$ins->insert_id;
     $ins->close();
 
-    // Participación del creador
+    // Participación del creador (aceptada)
     if ($stp = $conn->prepare("
       INSERT INTO participaciones (jugador_id, reserva_id, es_creador, estado)
       VALUES (?, ?, 1, 'aceptada')
@@ -162,28 +224,14 @@ try {
       $stp->close();
     }
 
-    // Insert pagos
+    // Participaciones de registrados (sin crear pagos)
     if (!empty($splitPlan['enabled'])) {
-      $creatorAmount = (float)($splitPlan['creator_amount'] ?? $precioFinal);
       $parts = $splitPlan['participants'] ?? [];
-
-      // pago del creador (estado SIEMPRE pendiente, fecha_pago condicional)
-      $stPay = $conn->prepare("
-        INSERT INTO pagos (reserva_id, jugador_id, monto, metodo, referencia_gateway, detalle, estado, fecha_pago)
-        VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)
-      ");
-      $stPay->bind_param("iidssss", $insertedId, $uid, $creatorAmount, $metodoEnum, $refGateway, $detalle, $fechaPago);
-      $stPay->execute();
-      $stPay->close();
-
-      // pagos participantes registrados + participaciones + notificaciones
       foreach ($parts as $p) {
         if (($p['mode'] ?? '') !== 'reg') continue;
         $pid = (int)($p['user_id'] ?? 0);
-        $amt = (float)($p['amount'] ?? 0);
-        if ($pid <= 0 || $amt <= 0) continue;
+        if ($pid <= 0) continue;
 
-        // participacion
         if ($stp2 = $conn->prepare("
           INSERT INTO participaciones (jugador_id, reserva_id, es_creador, estado)
           VALUES (?, ?, 0, 'pendiente')
@@ -192,42 +240,26 @@ try {
           $stp2->execute();
           $stp2->close();
         }
-
-        // pago pendiente del participante
-        $m = 'club';
-        if ($stPay2 = $conn->prepare("
-          INSERT INTO pagos (reserva_id, jugador_id, monto, metodo, referencia_gateway, detalle, estado, fecha_pago)
-          VALUES (?, ?, ?, ?, NULL, NULL, 'pendiente', NULL)
-        ")) {
-          $stPay2->bind_param("iids", $insertedId, $pid, $amt, $m);
-          $stPay2->execute();
-          $stPay2->close();
-        }
-
-        // notificación
-        $tit = "Pago pendiente de reserva #".$insertedId;
-        $msg = "Tenés un pago pendiente de $ ".number_format($amt,2,',','.')." para la reserva #".$insertedId." (".$fecha." ".$horaIniSql." - ".$horaFinSql.").";
-        if ($stN = $conn->prepare("
-          INSERT INTO notificaciones (usuario_id, tipo, origen, titulo, mensaje)
-          VALUES (?, 'pago_pendiente', 'sistema', ?, ?)
-        ")) {
-          $stN->bind_param("iss", $pid, $tit, $msg);
-          $stN->execute();
-          $stN->close();
-        }
       }
-
-    } else {
-      // No divide: un solo pago (estado SIEMPRE pendiente, fecha_pago condicional)
-      $monto = $precioFinal;
-      $stPay = $conn->prepare("
-        INSERT INTO pagos (reserva_id, jugador_id, monto, metodo, referencia_gateway, detalle, estado, fecha_pago)
-        VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)
-      ");
-      $stPay->bind_param("iidssss", $insertedId, $uid, $monto, $metodoEnum, $refGateway, $detalle, $fechaPago);
-      $stPay->execute();
-      $stPay->close();
     }
+
+    // Insert 1 SOLO pago (del creador)
+    $stPay = $conn->prepare("
+      INSERT INTO pagos (reserva_id, jugador_id, monto, metodo, referencia_gateway, detalle, estado, fecha_pago)
+      VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)
+    ");
+    $stPay->bind_param(
+      "iidssss",
+      $insertedId,
+      $uid,
+      $montoTotalReserva, // TOTAL reserva
+      $metodoEnum,
+      $refGateway,
+      $detalle,          // ✅ solo nombres separados por coma, o NULL
+      $fechaPago
+    );
+    $stPay->execute();
+    $stPay->close();
 
     $conn->commit();
 
@@ -265,12 +297,21 @@ try {
         <div><strong>Fecha:</strong> <?= h($fecha) ?></div>
         <div><strong>Hora:</strong> <?= h(substr($horaIniSql,0,5) . ' - ' . substr($horaFinSql,0,5)) ?></div>
         <div><strong>Método elegido:</strong> <?= h(ucfirst($metodoPost)) ?></div>
+
         <div><strong>Estado de la reserva:</strong> Confirmada</div>
         <div><strong>Estado del pago:</strong> Pendiente</div>
+
+        <hr style="opacity:.2; margin:10px 0">
+
+        <div><strong>Total reserva (pagos.monto):</strong> $ <?= number_format($montoTotalReserva, 2, ',', '.') ?></div>
+        <div><strong>Cobrado al jugador:</strong> $ <?= number_format($montoCobradoJugador, 2, ',', '.') ?></div>
         <div><strong>Fecha de pago:</strong> <?= $fechaPago ? h($fechaPago) : '-' ?></div>
-        <div><strong>Total:</strong> $ <?= number_format($precioFinal, 2, ',', '.') ?></div>
-        <div class="muted" style="margin-top:6px;">El pago queda en pendiente hasta verificación del club.</div>
+
+        <?php if ($divididoEnUi): ?>
+          <div style="margin-top:8px;"><strong>Dividido en:</strong> <?= h($divididoEnUi) ?></div>
+        <?php endif; ?>
       </div>
+
       <div style="display:flex; gap:10px; justify-content:space-between; margin-top:20px;">
         <a href="/php/cliente/historial_estadisticas/historial_estadisticas.php" class="btn back">Ver mis reservas</a>
         <a href="/php/cliente/home_cliente.php" class="btn confirm">Volver al inicio</a>
