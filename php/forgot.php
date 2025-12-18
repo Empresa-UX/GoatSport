@@ -81,7 +81,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $html = "
         <div style='font-family: Arial, sans-serif; background-color: #e0f2f1; padding: 40px;'>
             <div style='max-width: 600px; margin: auto; background: #ffffff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 30px; text-align: center;'>
-                <img src='https://i.postimg.cc/tChXrCQX/goatsport.jpg' alt='GoatSport' style='width: 180px; margin-bottom: 20px;'>
+                <img src='https://i.postimg.cc/1tQ2yFF0/goatsport.jpg' alt='GoatSport' style='width: 180px; margin-bottom: 20px;'>
                 <h1 style='color: #054a56; font-size: 28px; margin-bottom: 20px;'>Recuperación de Contraseña</h1>
                 <p style='color: #333; font-size: 16px; margin-bottom: 30px;'>
                     Has solicitado recuperar tu contraseña en <strong>GOAT Sports</strong>. Utilizá el siguiente código para restablecerla.
