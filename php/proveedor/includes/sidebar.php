@@ -12,7 +12,7 @@
         <img src="/img/logotipo.png" alt="Logo Padel">
     </a>
 
-    <a href="/php/proveedor/recepcionistas/recepcionistas.php">Crear recepcionista</a>
+    <a href="/php/proveedor/recepcionistas/recepcionistas.php">Recepcionistas</a>
     <a href="/php/proveedor/canchas/canchas.php">Canchas</a>
     <a href="/php/proveedor/reservas/reservas.php">Reservas</a>
     <a href="/php/proveedor/pagos/pagos.php">Pagos</a>
