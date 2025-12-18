@@ -160,7 +160,8 @@ Desarrollador Full Stack
 Proyecto desarrollado como parte de portafolio profesional, demostrando capacidades en diseño de sistemas, lógica de negocio y modelado de datos.
 
 <div align="center">
-
 **Proyecto orientado a demostrar arquitectura real y buenas prácticas**
-
 </div>
+
+## 📄 Licencia
+Este proyecto se distribuye bajo la licencia MIT. Consulta el archivo `LICENSE` para más detalles.
