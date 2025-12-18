@@ -5,6 +5,7 @@
  * ========================================================================= */
 include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
+include './../includes/cards.php';
 include __DIR__ . '/../../config.php';
 
 if (session_status()===PHP_SESSION_NONE) session_start();

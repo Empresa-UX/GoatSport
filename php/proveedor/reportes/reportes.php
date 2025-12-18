@@ -9,6 +9,7 @@
  * ========================================================================= */
 include '../includes/header.php';
 include '../includes/sidebar.php';
+include './../includes/cards.php';
 include '../../config.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();

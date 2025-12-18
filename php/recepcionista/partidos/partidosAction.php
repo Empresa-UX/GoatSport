@@ -27,58 +27,68 @@ function notify_user(mysqli $conn, int $user_id, string $tipo, string $origen, s
 
 /** Upsert simple en ranking (solo puntos) */
 function ranking_add_points(mysqli $conn, int $usuario_id, int $delta): void {
-  // why: asegurar fila de ranking
   $sel = $conn->prepare("SELECT ranking_id FROM ranking WHERE usuario_id=? LIMIT 1");
-  $sel->bind_param("i",$usuario_id); $sel->execute(); $sel->bind_result($rid); $exists = $sel->fetch(); $sel->close();
+  $sel->bind_param("i",$usuario_id);
+  $sel->execute();
+  $sel->bind_result($rid);
+  $exists = $sel->fetch();
+  $sel->close();
+
   if ($exists) {
     $up=$conn->prepare("UPDATE ranking SET puntos = GREATEST(0, puntos + ?) WHERE usuario_id=?");
-    $up->bind_param("ii",$delta,$usuario_id); $up->execute(); $up->close();
+    $up->bind_param("ii",$delta,$usuario_id);
+    $up->execute();
+    $up->close();
   } else {
     $pmax = max(0,$delta);
     $in=$conn->prepare("INSERT INTO ranking (usuario_id, puntos, partidos, victorias, derrotas) VALUES (?,?,?,?,?)");
-    $zero=0; $in->bind_param("iiiii",$usuario_id,$pmax,$zero,$zero,$zero); $in->execute(); $in->close();
+    $zero=0;
+    $in->bind_param("iiiii",$usuario_id,$pmax,$zero,$zero,$zero);
+    $in->execute();
+    $in->close();
   }
 }
 
 /** true si ya existe historial de este torneo */
 function has_tournament_points(mysqli $conn, int $usuario_id, int $torneo_id): bool {
   $q=$conn->prepare("SELECT 1 FROM puntos_historial WHERE usuario_id=? AND origen='torneo' AND referencia_id=? LIMIT 1");
-  $q->bind_param("ii",$usuario_id,$torneo_id); $q->execute(); $q->store_result(); $ok = $q->num_rows>0; $q->close(); return $ok;
+  $q->bind_param("ii",$usuario_id,$torneo_id);
+  $q->execute();
+  $q->store_result();
+  $ok = $q->num_rows>0;
+  $q->close();
+  return $ok;
 }
 
-/** asignar puntos al ganador del torneo (idempotente) */
-// 1) Versión CORRECTA (sólo esta función hay que tocar)
-function award_tournament_points(mysqli $conn, int $usuario_id, int $torneo_id, int $puntos): void {
-  if ($puntos<=0) return;
-  if (has_tournament_points($conn,$usuario_id,$torneo_id)) return;
+/** asignar puntos al ganador del torneo (idempotente). Devuelve true si efectivamente otorgó */
+function award_tournament_points(mysqli $conn, int $usuario_id, int $torneo_id, int $puntos): bool {
+  if ($puntos<=0) return false;
+  if (has_tournament_points($conn,$usuario_id,$torneo_id)) return false;
 
   $ins = $conn->prepare("
     INSERT INTO puntos_historial (usuario_id, origen, referencia_id, puntos, descripcion)
     VALUES (?,?,?,?,?)
   ");
 
-  // ❗ bind_param requiere variables (por referencia). Nada de expresiones.
   $origen = 'torneo';
   $desc   = "Ganador torneo #{$torneo_id}";
-
-  // tipos: i (usuario_id), s (origen enum), i (referencia_id), i (puntos), s (descripcion)
   $ins->bind_param("isiis", $usuario_id, $origen, $torneo_id, $puntos, $desc);
   $ins->execute();
   $ins->close();
 
   ranking_add_points($conn, $usuario_id, $puntos);
+  return true;
 }
-
-/* 2) (OPCIONAL, pero recomendado en ambiente de pruebas)
-   Al principio del script, después de require config:
-   mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-*/
 
 /** revertir puntos si se cambia/elimina ganador de la final */
 function revert_tournament_points(mysqli $conn, int $usuario_id, int $torneo_id, int $puntos): void {
   if ($puntos<=0) return;
+
   $del=$conn->prepare("DELETE FROM puntos_historial WHERE usuario_id=? AND origen='torneo' AND referencia_id=?");
-  $del->bind_param("ii",$usuario_id,$torneo_id); $del->execute(); $del->close();
+  $del->bind_param("ii",$usuario_id,$torneo_id);
+  $del->execute();
+  $del->close();
+
   ranking_add_points($conn,$usuario_id,-$puntos);
 }
 
@@ -89,9 +99,18 @@ function compute_start_end(array $row): array {
     $start = $row['r_fecha'].' '.$row['r_hora_inicio'];
     if (!empty($row['r_hora_fin'])) $end = $row['r_fecha'].' '.$row['r_hora_fin'];
   }
-  if (!$start) $start = $row['p_fecha']; // p.fecha es datetime
-  if (!$end)   $end   = $row['p_fecha']; // fallback
+  if (!$start) $start = $row['p_fecha'];
+  if (!$end)   $end   = $row['p_fecha'];
   return [$start,$end];
+}
+
+/** marcar torneo como finalizado (idempotente) */
+function mark_tournament_finalized(mysqli $conn, int $torneo_id): void {
+  if ($torneo_id <= 0) return;
+  $st = $conn->prepare("UPDATE torneos SET estado='finalizado' WHERE torneo_id=? AND estado <> 'finalizado'");
+  $st->bind_param("i", $torneo_id);
+  $st->execute();
+  $st->close();
 }
 
 /* ===== Guardar/editar resultado ===== */
@@ -106,7 +125,7 @@ if ($action === 'save_result') {
       p.partido_id, p.torneo_id, p.jugador1_id, p.jugador2_id,
       p.fecha AS p_fecha, p.resultado AS prev_res, p.ganador_id AS prev_gan,
       p.next_partido_id, p.next_pos,
-      t.proveedor_id AS prov_torneo, t.puntos_ganador,
+      t.proveedor_id AS prov_torneo, t.puntos_ganador, t.nombre AS torneo_nombre,
       r.fecha AS r_fecha, r.hora_inicio AS r_hora_inicio, r.hora_fin AS r_hora_fin,
       c.proveedor_id AS prov_cancha
     FROM partidos p
@@ -129,7 +148,6 @@ if ($action === 'save_result') {
   [$startStr,$endStr] = compute_start_end($info);
   $now = new DateTimeImmutable('now');
   $start = new DateTimeImmutable($startStr);
-  // why: evitar cargar antes de iniciado; si hay fin, se podría endurecer a >= fin
   if ($now < $start) err('Aún no comenzó este partido. Podrás cargarlo cuando inicie.', $fechaPartido);
 
   $j1=(int)($info['jugador1_id'] ?? 0);
@@ -143,32 +161,43 @@ if ($action === 'save_result') {
   $torneo_id = (int)($info['torneo_id'] ?? 0);
   $isFinal = ($torneo_id>0 && empty($info['next_partido_id'])); // final detect
 
+  $torneoNombre = trim((string)($info['torneo_nombre'] ?? ''));
+  if ($torneoNombre === '') $torneoNombre = "Torneo #{$torneo_id}";
+
   $conn->begin_transaction();
 
+  $awarded = false; // para notificación idempotente al ganador
   try {
+    // Guardar resultado
     $up=$conn->prepare("UPDATE partidos SET resultado=?, ganador_id=? WHERE partido_id=?");
     $up->bind_param("sii",$resultado,$ganador_id,$partido_id);
-    $up->execute(); $up->close();
+    $up->execute();
+    $up->close();
 
     // Propagar ganador a siguiente match si aplica
     $nextId  = (int)($info['next_partido_id'] ?? 0);
     $nextPos = ($info['next_pos'] ?? null);
     if ($nextId > 0 && ($nextPos === 'j1' || $nextPos === 'j2')) {
-      if ($nextPos === 'j1') {
-        $nx = $conn->prepare("UPDATE partidos SET jugador1_id=? WHERE partido_id=?");
-      } else {
-        $nx = $conn->prepare("UPDATE partidos SET jugador2_id=? WHERE partido_id=?");
-      }
+      $nx = ($nextPos === 'j1')
+        ? $conn->prepare("UPDATE partidos SET jugador1_id=? WHERE partido_id=?")
+        : $conn->prepare("UPDATE partidos SET jugador2_id=? WHERE partido_id=?");
       $nx->bind_param("ii", $ganador_id, $nextId);
-      $nx->execute(); $nx->close();
+      $nx->execute();
+      $nx->close();
     }
 
-    // Puntos torneo (solo final)
-    if ($isFinal && $ganador_id>0 && $puntosGanador>0) {
-      if ($wasSet && $prevWinner && $prevWinner !== $ganador_id) {
-        revert_tournament_points($conn,$prevWinner,$torneo_id,$puntosGanador);
+    // ✅ Si es final: otorgar puntos + marcar torneo finalizado
+    if ($isFinal) {
+      // puntos torneo (si config > 0)
+      if ($ganador_id>0 && $puntosGanador>0) {
+        if ($wasSet && $prevWinner && $prevWinner !== $ganador_id) {
+          revert_tournament_points($conn,$prevWinner,$torneo_id,$puntosGanador);
+        }
+        $awarded = award_tournament_points($conn,$ganador_id,$torneo_id,$puntosGanador);
       }
-      award_tournament_points($conn,$ganador_id,$torneo_id,$puntosGanador);
+
+      // ✅ marcar torneo como finalizado siempre que se cargue la final
+      mark_tournament_finalized($conn, $torneo_id);
     }
 
     $conn->commit();
@@ -177,7 +206,7 @@ if ($action === 'save_result') {
     err('Error guardando el resultado',$fechaPartido);
   }
 
-  // Notificaciones
+  // Notificaciones generales (admins + proveedor)
   $tipo = $wasSet ? 'resultado_editado' : 'resultado_nuevo';
   $origen='recepcion';
   $titulo = ($wasSet ? "Resultado editado" : "Resultado cargado") . " (#{$partido_id})";
@@ -185,6 +214,15 @@ if ($action === 'save_result') {
   notify_admins($conn,$tipo,$origen,$titulo,$mensaje);
   $proveedor_to_notify = ($prov_t?:$prov_c);
   if ($proveedor_to_notify>0) notify_user($conn,$proveedor_to_notify,$tipo,$origen,$titulo,$mensaje);
+
+  // ✅ Notificación al ganador del torneo (solo si realmente se otorgaron puntos ahora)
+  if ($isFinal && $awarded) {
+    $tipoW   = 'torneo_ganado';
+    $origenW = 'recepcion';
+    $tituloW = "🏆 ¡Ganaste {$torneoNombre}!";
+    $mensajeW= "Felicitaciones, ganaste el torneo y recibiste {$puntosGanador} puntos.";
+    notify_user($conn, $ganador_id, $tipoW, $origenW, $tituloW, $mensajeW);
+  }
 
   ok($wasSet?'Resultado actualizado':'Resultado guardado',$fechaPartido);
 }
@@ -204,7 +242,11 @@ if ($action === 'delete_result') {
         LEFT JOIN reservas r ON r.reserva_id = p.reserva_id
         LEFT JOIN canchas  c ON c.cancha_id  = r.cancha_id
         WHERE p.partido_id=? LIMIT 1";
-  $st=$conn->prepare($sql); $st->bind_param("i",$partido_id); $st->execute(); $row=$st->get_result()->fetch_assoc(); $st->close();
+  $st=$conn->prepare($sql);
+  $st->bind_param("i",$partido_id);
+  $st->execute();
+  $row=$st->get_result()->fetch_assoc();
+  $st->close();
   if(!$row) err('Partido inexistente');
 
   $fechaPartido = date('Y-m-d', strtotime($row['p_fecha']));
@@ -215,23 +257,22 @@ if ($action === 'delete_result') {
 
   $conn->begin_transaction();
   try {
-    // Limpiar resultado del partido actual
     $up=$conn->prepare("UPDATE partidos SET resultado=NULL, ganador_id=NULL WHERE partido_id=?");
-    $up->bind_param("i",$partido_id); $up->execute(); $up->close();
+    $up->bind_param("i",$partido_id);
+    $up->execute();
+    $up->close();
 
-    // Limpiar el slot del siguiente partido si estaba apuntando acá
     $nextId  = (int)($row['next_partido_id'] ?? 0);
     $nextPos = ($row['next_pos'] ?? null);
     if ($nextId > 0 && ($nextPos === 'j1' || $nextPos === 'j2')) {
-      if ($nextPos === 'j1') {
-        $nx = $conn->prepare("UPDATE partidos SET jugador1_id=NULL WHERE partido_id=?");
-      } else {
-        $nx = $conn->prepare("UPDATE partidos SET jugador2_id=NULL WHERE partido_id=?");
-      }
-      $nx->bind_param("i", $nextId); $nx->execute(); $nx->close();
+      $nx = ($nextPos === 'j1')
+        ? $conn->prepare("UPDATE partidos SET jugador1_id=NULL WHERE partido_id=?")
+        : $conn->prepare("UPDATE partidos SET jugador2_id=NULL WHERE partido_id=?");
+      $nx->bind_param("i", $nextId);
+      $nx->execute();
+      $nx->close();
     }
 
-    // Si era final, revertir puntos
     $torneo_id=(int)($row['torneo_id']??0);
     $isFinal = ($torneo_id>0 && empty($row['next_partido_id']));
     $prevWinner=(int)($row['ganador_id']??0);
@@ -268,7 +309,11 @@ if ($action === 'delete_match') {
         LEFT JOIN reservas r ON r.reserva_id = p.reserva_id
         LEFT JOIN canchas  c ON c.cancha_id  = r.cancha_id
         WHERE p.partido_id=? LIMIT 1";
-  $st=$conn->prepare($sql); $st->bind_param("i",$partido_id); $st->execute(); $row=$st->get_result()->fetch_assoc(); $st->close();
+  $st=$conn->prepare($sql);
+  $st->bind_param("i",$partido_id);
+  $st->execute();
+  $row=$st->get_result()->fetch_assoc();
+  $st->close();
   if(!$row) err('Partido inexistente');
 
   $fechaPartido = date('Y-m-d', strtotime($row['p_fecha']));
@@ -277,7 +322,6 @@ if ($action === 'delete_match') {
 
   $conn->begin_transaction();
   try {
-    // Si era final y tenía ganador, revertir puntos antes de borrar
     $torneo_id=(int)($row['torneo_id']??0);
     $isFinal = ($torneo_id>0 && empty($row['next_partido_id']));
     $prevWinner=(int)($row['ganador_id']??0);
