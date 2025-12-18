@@ -46,12 +46,12 @@ $st->close();
     .btn-add{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;text-decoration:none;font-weight:500;font-size:14px;white-space:nowrap;background:#1bab9d;color:#fff;border-radius:8px}
     .btn-add:hover{background:#139488;}
     .alert-ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:10px;padding:10px 12px;margin:12px 0;}
-    .fbar{display:grid;grid-template-columns:minmax(280px,1fr) minmax(200px,240px);
+    .fbar{display:grid;grid-template-columns: minmax(280px,1fr) minmax(200px,240px);
       gap:12px;align-items:end;background:#fff;padding:14px 16px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.08);margin-bottom:12px;}
     @media (max-width:760px){.fbar{grid-template-columns:1fr;}}
     .f{display:flex;flex-direction:column;gap:6px;}
     .f label{font-size:12px;color:#586168;font-weight:700;}
-    .f input[type="text"]{padding:9px 10px;border:1px solid #d6dadd;border-radius:10px;background:#fff;outline:none;}
+    .f input[type="text"]{padding:9px 10px;border:1px solid #d6dadd;border-radius:10px;background:#fff;outline:none; width: 300px;}
 
     table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border-radius:12px;overflow:hidden;table-layout:fixed;}
     thead th{position:sticky;top:0;background:#f8fafc;z-index:1;text-align:left;font-weight:700;padding:10px 12px;font-size:13px;color:#334155;border-bottom:1px solid #e5e7eb;}
@@ -81,7 +81,6 @@ $st->close();
       <label>Buscar (nombre o email)</label>
       <input type="text" id="f-q" placeholder="Ej: Juan / @gmail.com">
     </div>
-    <div class="f"><label>—</label><div class="sub">Solo ves recepcionistas asignados a tu club.</div></div>
   </div>
 
   <table id="tablaRecep">

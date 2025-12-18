@@ -108,9 +108,10 @@ if ($action==='add') {
   $st=$conn->prepare($sql);
   $cancha_val = $cancha_id>0 ? $cancha_id : null;
   $hi_val = $hi ?: null; $hf_val = $hf ?: null;
-  $st->bind_param("iissdssssii",
-    $proveedor_id, $cancha_val, $nombre, $descripcion, $pct, $fi, $ff, $hi_val, $hf_val, $dias_sql, $minRes
-  );
+$st->bind_param("iissdsssssi",
+  $proveedor_id, $cancha_val, $nombre, $descripcion, $pct, $fi, $ff, $hi_val, $hf_val, $dias_sql, $minRes
+);
+
   $st->execute(); $st->close();
 
   // Notificar admin(es) y recepcionista(s)
