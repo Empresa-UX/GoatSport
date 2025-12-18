@@ -169,7 +169,6 @@ $tipoLbl = strtolower($torneo['tipo'])==='individual' ? 'Individual' : 'Equipo';
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <a class="btn-add" href="torneoCronograma.php?torneo_id=<?= (int)$torneo_id ?>">Ver cronograma</a>
       <a class="btn-add" href="torneos.php">Volver</a>
     </div>
   </div>

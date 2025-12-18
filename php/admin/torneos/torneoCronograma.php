@@ -160,7 +160,6 @@ $tipoLbl = strtolower($torneo['tipo'])==='individual' ? 'Individual' : 'Equipo';
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <!-- Si más adelante creás una vista "lista" real del cronograma, cambiás este href -->
-      <a class="btn-action plan" href="torneoCronograma.php?torneo_id=<?= (int)$torneo_id ?>">Ver cronograma</a>
       <a class="btn-action part" href="torneos.php">Volver</a>
     </div>
   </div>
