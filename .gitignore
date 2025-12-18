@@ -1,15 +1,80 @@
-# Ignorar archivos del sistema
+# ===============================
+# Sistema Operativo
+# ===============================
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Ignorar dependencias de Composer (si se usa)
+# ===============================
+# IDEs / Editores
+# ===============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===============================
+# Dependencias
+# ===============================
 /vendor/
+node_modules/
 
-# Archivos de configuración local
-*.env
+# ===============================
+# Archivos de entorno y config
+# ===============================
+.env
+.env.*
+config.php
+config.local.php
 
-# Archivos de log
+# ===============================
+# Logs y cache
+# ===============================
 *.log
+logs/
+cache/
+tmp/
 
-# Archivos generados de build
+# ===============================
+# Archivos de build / compilados
+# ===============================
 /dist/
+/build/
+
+# ===============================
+# Subidas y archivos generados
+# ===============================
+uploads/
+storage/
+public/uploads/
+
+# ===============================
+# Base de datos
+# ===============================
+*.sql
+*.sqlite
+
+# ===============================
+# Tests / coverage
+# ===============================
+/coverage/
+
+# ===============================
+# Archivos temporales
+# ===============================
+*.tmp
+*.bak
+*.old
+
+# ===============================
+# Servidores locales
+# ===============================
+.htaccess
+.nginx.conf
+
+# ===============================
+# Seguridad
+# ===============================
+*.key
+*.pem
+*.crt
